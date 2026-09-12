@@ -1,0 +1,35 @@
+# dependencies
+/node_modules
+
+# Next.js
+/.next
+/out
+
+# tests and tooling
+/coverage
+/.vitest
+
+# local environment files
+.env
+.env.local
+.env.*.local
+
+# local databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+
+# generated logs
+*.log
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts

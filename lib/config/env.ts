@@ -1,0 +1,33 @@
+import { z } from "zod";
+
+const optionalSecret = z.preprocess((value) => (value === "" ? undefined : value), z.string().min(1).optional());
+
+export const envSchema = z.object({
+  DATABASE_URL: z.string().min(1).default("file:./dev.db"),
+  DEMO_MODE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+  LLM_PROVIDER: optionalSecret,
+  LLM_API_KEY: optionalSecret,
+  LLM_MODEL: optionalSecret,
+  PERSONA_API_KEY: optionalSecret,
+  PERSONA_WEBHOOK_SECRET: optionalSecret,
+  PERSONA_ENVIRONMENT_ID: optionalSecret,
+  PERSONA_TEMPLATE_ID: optionalSecret,
+});
+
+export type AppEnv = z.infer<typeof envSchema>;
+
+export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
+  return envSchema.parse(source);
+}
+
+export function configurationFlags(env: AppEnv) {
+  return {
+    llmConfigured: Boolean(env.LLM_PROVIDER && env.LLM_API_KEY && env.LLM_MODEL),
+    personaConfigured: Boolean(
+      env.PERSONA_API_KEY && env.PERSONA_ENVIRONMENT_ID && env.PERSONA_TEMPLATE_ID,
+    ),
+  };
+}

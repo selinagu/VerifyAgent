@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String       @id
+  displayName String
+  email       String?      @unique
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  sessions    UserSession[]
+  items       InventoryItem[]
+  tasks       TaskRun[]
+  listings    Listing[]
+  verifications VerificationSession[]
+  grants      AuthorizationGrant[]
+}
+
+model UserSession {
+  id            String       @id
+  userId        String
+  createdAt     DateTime     @default(now())
+  expiresAt     DateTime
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks         TaskRun[]
+  verifications VerificationSession[]
+  grants        AuthorizationGrant[]
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model InventoryItem {
+  id          String    @id
+  ownerId     String
+  type        String
+  title       String
+  description String
+  eventAt     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  listings    Listing[]
+
+  @@index([ownerId])
+}
+
+model TaskRun {
+  id            String       @id
+  userId        String
+  sessionId     String
+  requestText   String
+  status        String
+  correlationId String       @unique
+  agentProvider String?
+  agentModel    String?
+  promptVersion String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  user          User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  session       UserSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  actions       ActionRun[]
+  listings      Listing[]
+  auditEvents   AuditEvent[]
+
+  @@index([userId, createdAt])
+  @@index([sessionId])
+  @@index([status])
+}
+
+model ActionRun {
+  id              String       @id
+  taskId          String
+  sequence        Int
+  type            String
+  payloadJson     Json
+  rationale       String
+  status          String
+  requirement     String?
+  policyId        String?
+  policyVersion   Int?
+  reasonCode      String?
+  idempotencyKey  String       @unique
+  resultJson      Json?
+  errorCode       String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  task            TaskRun      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  verifications   VerificationSession[]
+  grants          AuthorizationGrant[]
+  auditEvents     AuditEvent[]
+
+  @@unique([taskId, sequence])
+  @@index([taskId, status])
+  @@index([type])
+}
+
+model Listing {
+  id           String        @id
+  ownerId      String
+  sourceItemId String
+  taskId       String?
+  title        String
+  description  String
+  priceCents   Int?
+  currency     String        @default("USD")
+  status       String
+  version      Int           @default(1)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  sourceItem   InventoryItem @relation(fields: [sourceItemId], references: [id], onDelete: Restrict)
+  task         TaskRun?      @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, status])
+  @@index([sourceItemId])
+  @@index([taskId])
+}
+
+model VerificationSession {
+  id                  String       @id
+  userId              String
+  sessionId           String
+  actionId            String
+  personaInquiryId    String?      @unique
+  personaReferenceId  String       @unique
+  status              String
+  verifiedAt          DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  user                User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  session             UserSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  action              ActionRun    @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  grant               AuthorizationGrant?
+
+  @@index([userId, status])
+  @@index([sessionId])
+  @@index([actionId, createdAt])
+}
+
+model AuthorizationGrant {
+  id                    String              @id
+  userId                String
+  sessionId             String
+  actionId              String
+  verificationSessionId String              @unique
+  scopeHash             String
+  status                String
+  issuedAt              DateTime            @default(now())
+  expiresAt             DateTime
+  consumedAt            DateTime?
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  session               UserSession         @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  action                ActionRun            @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  verificationSession   VerificationSession @relation(fields: [verificationSessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([sessionId])
+  @@index([actionId, status])
+  @@index([scopeHash])
+  @@index([expiresAt])
+}
+
+model AuditEvent {
+  id            String     @id
+  taskId        String?
+  actionId      String?
+  actorType     String
+  eventType     String
+  outcome       String
+  reasonCode    String?
+  metadataJson  Json?
+  correlationId String
+  createdAt     DateTime   @default(now())
+  task          TaskRun?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  action        ActionRun? @relation(fields: [actionId], references: [id], onDelete: SetNull)
+
+  @@index([taskId, createdAt])
+  @@index([actionId, createdAt])
+  @@index([correlationId, createdAt])
+  @@index([eventType])
+}
