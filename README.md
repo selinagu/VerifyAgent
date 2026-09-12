@@ -12,7 +12,7 @@ user request
   -> append-only audit trail
 ```
 
-This repository currently contains **Phase 0 through Phase 4**: project infrastructure, canonical contracts, persistent domain models, an idempotent marketplace executor, deterministic authorization policy, pause/resume orchestration, confirmation evidence, a real Persona sandbox verification boundary, and a fail-closed LLM planning boundary. The full Agent Workspace remains intentionally absent.
+This repository currently contains **Phase 0 through Phase 5**: project infrastructure, canonical contracts, persistent domain models, an idempotent marketplace executor, deterministic authorization policy, pause/resume orchestration, confirmation evidence, a real Persona sandbox verification boundary, a fail-closed LLM planning boundary, and a complete Agent Workspace for the hackathon demo.
 
 ## Security invariants
 
@@ -40,6 +40,7 @@ Node.js 22.5 or newer is required. The migration smoke test uses Node's built-in
 
 ```text
 app/                    Minimal application and health endpoint
+components/workspace/   Responsive Agent Workspace and trust-state components
 lib/actions/            Canonical action schemas and display catalog
 lib/audit/              Append-only audit writer
 lib/config/             Environment validation
@@ -54,6 +55,8 @@ lib/orchestrator/       Restart-safe task runner
 lib/policy/             Pure deterministic policy engine and DB context builder
 lib/persona/            Persona API adapter, event parser, and webhook signature verification
 lib/planner/            LLM gateway, strict proposal schema, semantic validator, and compiler
+lib/client/             Browser API boundary, response validation, and UI state mapping
+lib/presentation/       Pure action and marketplace display formatters
 lib/state-machine/      Explicit action/task transition graphs and CAS updates
 lib/tasks/              Safe task snapshots
 lib/verification/       Verification lifecycle, webhook processing, and grant issuance
@@ -92,6 +95,7 @@ pnpm demo:phase1      # Run draft -> set $80 -> publish through the executor
 pnpm demo:phase2      # Run policy -> confirmation -> test grant -> publish
 pnpm demo:phase3      # Run a signed fake-Persona end-to-end flow without network
 pnpm demo:phase4      # Plan from natural language, authorize, verify, and publish without network
+pnpm demo:phase5      # Run the full Phase 4 flow plus Workspace contract smoke tests
 ```
 
 ## Environment
@@ -307,10 +311,49 @@ pnpm demo:phase4
 
 The demo resets only the demo namespace and exercises fake planning, confirmation, a signed fake-Persona webhook, one-time grant consumption, and final publication.
 
+## Phase 5 Agent Workspace
+
+The `/` route is now a responsive trust workspace rather than a status placeholder. It exposes the entire server-owned lifecycle in one presentation:
+
+```text
+request composer
+  -> structured action timeline
+  -> run to a durable authorization boundary
+  -> exact-price confirmation
+  -> Persona identity verification
+  -> marketplace result
+  -> append-only audit trail
+```
+
+The browser never infers policy or authorization from action types. It renders `status`, `requirement`, confirmation hashes, verification state, marketplace results, and audit events from allowlisted server snapshots. Malformed API responses fail closed. A browser Persona callback only updates explanatory copy; only the signed webhook plus authoritative server retrieval can activate a grant and resume publishing.
+
+For the offline Workspace, configure `DEMO_MODE=true` and `LLM_PROVIDER=fake`, run migrations and seed, then start the app. The fake planner supports the stable prompt `Sell my concert ticket for $80.`. The real sandbox experience uses `LLM_PROVIDER=openai` with the server-side OpenAI variables and the Phase 3 Persona sandbox variables.
+
+```bash
+pnpm db:migrate
+pnpm db:seed
+pnpm dev
+```
+
+The Workspace includes a demo-only reset control backed by `POST /api/demo/reset`. That endpoint accepts only `{}`, rejects non-demo environments, and always resets the fixed demo namespace—callers cannot select a user or database scope. `GET /api/demo/context` returns only the safe fixed prompt and inventory preview needed by the demo.
+
+Recovery behavior is explicit: safe upstream/network failures can be refreshed; changed confirmation payloads require a new review; rejected confirmations cancel the task; declined, failed, or expired Persona attempts leave publishing blocked. The latest task ID is stored only as navigation state and is revalidated against server ownership when the page reloads.
+
+### Phase 5 demo
+
+```bash
+pnpm demo:phase5
+```
+
+This runs the signed fake-Persona end-to-end flow and the Workspace API, state-mapping, formatting, reset-boundary, and malformed-response smoke tests.
+
 ## Phase boundary
 
-The next step is **Phase 5: Agent Workspace UI**. It will make the existing durable task, confirmation, verification, and audit states easy to demonstrate without weakening any server-side boundary.
+The hackathon MVP is now complete through **Phase 5**. Possible stretch work includes task history, audit filters, a guided demo overlay, production authentication, deployment, and a real marketplace adapter.
 
 Still intentionally absent:
 
-- Agent Workspace and marketplace UI.
+- multi-user authentication and task history;
+- multi-turn chat or autonomous replanning;
+- real marketplace, payments, RAG, and LLM tool calling;
+- production deployment and Persona production configuration.

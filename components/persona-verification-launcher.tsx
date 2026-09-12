@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
 type PersonaClient = {
   open(): void;
@@ -94,7 +95,11 @@ export function PersonaVerificationLauncher({ verificationId }: { verificationId
         };
         script.onerror = () => setMessage("Persona could not load. Publishing remains blocked.");
         document.head.appendChild(script);
-        interval = setInterval(() => void poll().catch(() => undefined), 2_000);
+        interval = setInterval(() => {
+          void poll().then((terminal) => {
+            if (terminal && interval) clearInterval(interval);
+          }).catch(() => undefined);
+        }, 2_000);
       } catch {
         if (!cancelled) setMessage("Verification could not be started. Publishing remains blocked.");
       }
@@ -120,6 +125,14 @@ export function PersonaVerificationLauncher({ verificationId }: { verificationId
         >
           Open verification
         </button>
+      )}
+      {finished && (
+        <Link
+          href="/"
+          className="mt-7 inline-flex rounded-full bg-cyan-300 px-5 py-3 font-semibold text-slate-950 outline-none transition hover:bg-cyan-200 focus-visible:ring-4 focus-visible:ring-cyan-300/20"
+        >
+          Return to workspace
+        </Link>
       )}
       <p className="mt-6 text-xs leading-5 text-slate-500">
         Browser completion never authorizes the action. VerifyAgent waits for a signed Persona webhook and a server-side inquiry check.

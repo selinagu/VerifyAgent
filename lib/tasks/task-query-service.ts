@@ -19,6 +19,8 @@ export async function getTaskSnapshot(prisma: PrismaClient, taskId: string, user
     id: task.id,
     status: task.status,
     requestText: task.requestText,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
     planning: {
       provider: task.agentProvider,
       model: task.agentModel,
@@ -30,11 +32,14 @@ export async function getTaskSnapshot(prisma: PrismaClient, taskId: string, user
       sequence: action.sequence,
       type: action.type,
       payload: action.payloadJson,
+      rationale: action.rationale,
       status: action.status,
       requirement: action.requirement,
       reasonCode: action.reasonCode,
       result: action.resultJson,
       errorCode: action.errorCode,
+      createdAt: action.createdAt,
+      updatedAt: action.updatedAt,
       confirmationRequired: action.status === "WAITING_CONFIRMATION",
       confirmationPayloadHash:
         action.status === "WAITING_CONFIRMATION"
