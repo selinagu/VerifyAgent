@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 const optionalSecret = z.preprocess((value) => (value === "" ? undefined : value), z.string().min(1).optional());
+const optionalLlmProvider = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.enum(["openai", "fake"]).optional(),
+);
 
 export const envSchema = z.object({
   DATABASE_URL: z.string().min(1).default("file:./dev.db"),
@@ -8,7 +12,7 @@ export const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
-  LLM_PROVIDER: optionalSecret,
+  LLM_PROVIDER: optionalLlmProvider,
   LLM_API_KEY: optionalSecret,
   LLM_MODEL: optionalSecret,
   PERSONA_API_KEY: optionalSecret,
@@ -26,7 +30,10 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
 
 export function configurationFlags(env: AppEnv) {
   return {
-    llmConfigured: Boolean(env.LLM_PROVIDER && env.LLM_API_KEY && env.LLM_MODEL),
+    llmConfigured:
+      env.LLM_PROVIDER === "fake"
+        ? env.DEMO_MODE || process.env.NODE_ENV === "test"
+        : Boolean(env.LLM_PROVIDER === "openai" && env.LLM_API_KEY && env.LLM_MODEL),
     personaConfigured: Boolean(
       env.PERSONA_API_KEY &&
         env.PERSONA_WEBHOOK_SECRET &&

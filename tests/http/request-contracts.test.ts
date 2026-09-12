@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { getDemoExecutionContext } from "@/lib/auth/demo-context";
 import { parseEnv } from "@/lib/config/env";
-import { confirmationRequestSchema, emptyMutationBodySchema } from "@/lib/http/request-contracts";
+import {
+  confirmationRequestSchema,
+  emptyMutationBodySchema,
+  planningIdempotencyKeySchema,
+  taskCreationRequestSchema,
+} from "@/lib/http/request-contracts";
 
 describe("Phase 2 HTTP trust boundary", () => {
   afterEach(() => vi.unstubAllEnvs());
@@ -16,6 +21,17 @@ describe("Phase 2 HTTP trust boundary", () => {
         sessionId: "attacker-session",
       }).success,
     ).toBe(false);
+    expect(taskCreationRequestSchema.safeParse({ requestText: "Sell it", userId: "attacker" }).success).toBe(false);
+  });
+
+  it("validates bounded planning requests and idempotency keys", () => {
+    expect(taskCreationRequestSchema.parse({ requestText: "  Sell my ticket for $80.  " })).toEqual({
+      requestText: "Sell my ticket for $80.",
+    });
+    expect(taskCreationRequestSchema.safeParse({ requestText: "" }).success).toBe(false);
+    expect(planningIdempotencyKeySchema.safeParse("phase4-request-0001").success).toBe(true);
+    expect(planningIdempotencyKeySchema.safeParse("short").success).toBe(false);
+    expect(planningIdempotencyKeySchema.safeParse("phase4 request invalid").success).toBe(false);
   });
 
   it("rejects malformed confirmation data", () => {

@@ -12,7 +12,7 @@ user request
   -> append-only audit trail
 ```
 
-This repository currently contains **Phase 0 through Phase 3**: project infrastructure, canonical contracts, persistent domain models, an idempotent marketplace executor, deterministic authorization policy, pause/resume orchestration, confirmation evidence, and a real Persona sandbox verification boundary. The LLM planner and full Agent Workspace remain intentionally absent.
+This repository currently contains **Phase 0 through Phase 4**: project infrastructure, canonical contracts, persistent domain models, an idempotent marketplace executor, deterministic authorization policy, pause/resume orchestration, confirmation evidence, a real Persona sandbox verification boundary, and a fail-closed LLM planning boundary. The full Agent Workspace remains intentionally absent.
 
 ## Security invariants
 
@@ -53,6 +53,7 @@ lib/marketplace/        Listing invariants and transactional mutations
 lib/orchestrator/       Restart-safe task runner
 lib/policy/             Pure deterministic policy engine and DB context builder
 lib/persona/            Persona API adapter, event parser, and webhook signature verification
+lib/planner/            LLM gateway, strict proposal schema, semantic validator, and compiler
 lib/state-machine/      Explicit action/task transition graphs and CAS updates
 lib/tasks/              Safe task snapshots
 lib/verification/       Verification lifecycle, webhook processing, and grant issuance
@@ -90,6 +91,7 @@ pnpm db:seed          # Reset and seed the demo namespace
 pnpm demo:phase1      # Run draft -> set $80 -> publish through the executor
 pnpm demo:phase2      # Run policy -> confirmation -> test grant -> publish
 pnpm demo:phase3      # Run a signed fake-Persona end-to-end flow without network
+pnpm demo:phase4      # Plan from natural language, authorize, verify, and publish without network
 ```
 
 ## Environment
@@ -278,11 +280,37 @@ The fake demo still signs and verifies a Persona-shaped raw webhook, performs au
 - Failed webhook processing remains retryable; the same event can be processed again after an upstream recovery.
 - If publish execution fails after authorization, the one-time grant is revoked by the executor.
 
+## Phase 4 LLM planning
+
+Phase 4 accepts `POST /api/tasks` with `{ "requestText": "..." }` and a required `Idempotency-Key` header. In demo mode, server-owned demo identity is used; callers cannot inject a user, session, authorization requirement, action status, or execution result. A successful request returns a `READY` task and does not execute it automatically.
+
+```text
+untrusted natural-language request
+  -> OpenAI Responses API Structured Output
+  -> strict Zod allowlist
+  -> deterministic reference, dependency, ownership, and price validation
+  -> server-generated action IDs and symbolic-reference compilation
+  -> PROPOSED -> VALIDATED actions
+  -> existing task runner and authorization pipeline
+```
+
+Configure the real planner with `LLM_PROVIDER=openai`, `LLM_API_KEY`, and `LLM_MODEL`. The adapter calls the server-side Responses API with a strict JSON Schema, disables tools, sets a bounded output budget and timeout, rejects refusals/incomplete/malformed output, and never repairs model text. See the official [Responses API create reference](https://developers.openai.com/api/reference/cli/resources/responses/methods/create).
+
+`LLM_PROVIDER=fake` is permitted only in tests or when `DEMO_MODE=true`. It supports the fixed demo prompt `Sell my concert ticket for $80.` without network access. Planning failures persist a safe error code and audit event, create no actions unless the entire validated plan commits, and never mutate listings. Request idempotency is scoped to the trusted user and session; reusing a key with a different body returns a conflict.
+
+### Phase 4 demo
+
+```bash
+pnpm db:migrate
+pnpm demo:phase4
+```
+
+The demo resets only the demo namespace and exercises fake planning, confirmation, a signed fake-Persona webhook, one-time grant consumption, and final publication.
+
 ## Phase boundary
 
-The next step is **Phase 4: LLM planning**. It will convert user requests into strictly validated candidate action plans while preserving policy, verification, and executor authority boundaries.
+The next step is **Phase 5: Agent Workspace UI**. It will make the existing durable task, confirmation, verification, and audit states easy to demonstrate without weakening any server-side boundary.
 
 Still intentionally absent:
 
-- LLM planning;
 - Agent Workspace and marketplace UI.

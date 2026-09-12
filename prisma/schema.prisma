@@ -53,26 +53,30 @@ model InventoryItem {
 }
 
 model TaskRun {
-  id            String       @id
-  userId        String
-  sessionId     String
-  requestText   String
-  status        String
-  correlationId String       @unique
-  agentProvider String?
-  agentModel    String?
-  promptVersion String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  user          User         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  session       UserSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  actions       ActionRun[]
-  listings      Listing[]
-  auditEvents   AuditEvent[]
+  id                    String       @id
+  userId                String
+  sessionId             String
+  requestText           String
+  status                String
+  correlationId         String       @unique
+  agentProvider         String?
+  agentModel            String?
+  promptVersion         String?
+  requestIdempotencyKey String?      @unique
+  requestHash           String?
+  planningErrorCode     String?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  user                  User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  session               UserSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  actions               ActionRun[]
+  listings              Listing[]
+  auditEvents           AuditEvent[]
 
   @@index([userId, createdAt])
   @@index([sessionId])
   @@index([status])
+  @@index([requestHash])
 }
 
 model ActionRun {

@@ -45,6 +45,20 @@ export const EXECUTION_ERROR_CODES = [
   "VERIFICATION_ACTION_CHANGED",
   "VERIFICATION_EXPIRED",
   "INQUIRY_BINDING_MISMATCH",
+  "LLM_NOT_CONFIGURED",
+  "LLM_REQUEST_FAILED",
+  "LLM_TIMEOUT",
+  "LLM_RESPONSE_INVALID",
+  "LLM_REFUSAL",
+  "PLAN_SCHEMA_INVALID",
+  "PLAN_SEMANTIC_INVALID",
+  "PLAN_UNSUPPORTED_REQUEST",
+  "PLAN_REFERENCE_INVALID",
+  "PLAN_DEPENDENCY_INVALID",
+  "PLAN_RESOURCE_NOT_FOUND",
+  "PLAN_RESOURCE_OWNERSHIP_MISMATCH",
+  "PLAN_PRICE_MISMATCH",
+  "PLANNING_IDEMPOTENCY_CONFLICT",
 ] as const;
 
 export type ExecutionErrorCode = (typeof EXECUTION_ERROR_CODES)[number];
@@ -96,6 +110,20 @@ const SAFE_MESSAGES: Record<ExecutionErrorCode, string> = {
   VERIFICATION_ACTION_CHANGED: "The action changed after identity verification started.",
   VERIFICATION_EXPIRED: "The identity verification has expired.",
   INQUIRY_BINDING_MISMATCH: "The Persona inquiry does not match this verification.",
+  LLM_NOT_CONFIGURED: "The planning model is not configured.",
+  LLM_REQUEST_FAILED: "The planning model is temporarily unavailable.",
+  LLM_TIMEOUT: "The planning request timed out.",
+  LLM_RESPONSE_INVALID: "The planning model returned an invalid response.",
+  LLM_REFUSAL: "The planning model declined the request.",
+  PLAN_SCHEMA_INVALID: "The proposed action plan has an invalid structure.",
+  PLAN_SEMANTIC_INVALID: "The proposed action plan is not safe to execute.",
+  PLAN_UNSUPPORTED_REQUEST: "The request is outside the supported marketplace capability.",
+  PLAN_REFERENCE_INVALID: "The proposed action references an invalid result.",
+  PLAN_DEPENDENCY_INVALID: "The proposed action dependencies are invalid.",
+  PLAN_RESOURCE_NOT_FOUND: "The proposed plan references an unavailable resource.",
+  PLAN_RESOURCE_OWNERSHIP_MISMATCH: "The proposed plan references another user's resource.",
+  PLAN_PRICE_MISMATCH: "The proposed price does not match the user's request.",
+  PLANNING_IDEMPOTENCY_CONFLICT: "The idempotency key was already used for a different request.",
 };
 
 const RETRYABLE_CODES = new Set<ExecutionErrorCode>([
@@ -105,6 +133,8 @@ const RETRYABLE_CODES = new Set<ExecutionErrorCode>([
   "CONFIRMATION_REQUIRED",
   "IDENTITY_REQUIRED",
   "GRANT_NOT_FOUND",
+  "LLM_REQUEST_FAILED",
+  "LLM_TIMEOUT",
 ]);
 
 export class ExecutionError extends Error {

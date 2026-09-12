@@ -8,7 +8,7 @@ describe("health snapshot", () => {
     const env = envSchema.parse({
       DATABASE_URL: "file:./secret.db",
       DEMO_MODE: "true",
-      LLM_PROVIDER: "example",
+      LLM_PROVIDER: "openai",
       LLM_API_KEY: "llm-secret",
       LLM_MODEL: "example-model",
       PERSONA_API_KEY: "persona-secret",

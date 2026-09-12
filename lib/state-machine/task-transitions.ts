@@ -25,12 +25,17 @@ export function assertTaskTransition(from: string, to: string): void {
 
 export async function transitionTask(
   tx: Prisma.TransactionClient,
-  input: { taskId: string; from: TaskRunStatus; to: TaskRunStatus },
+  input: {
+    taskId: string;
+    from: TaskRunStatus;
+    to: TaskRunStatus;
+    data?: Prisma.TaskRunUpdateManyMutationInput;
+  },
 ): Promise<void> {
   assertTaskTransition(input.from, input.to);
   const result = await tx.taskRun.updateMany({
     where: { id: input.taskId, status: input.from },
-    data: { status: input.to },
+    data: { ...input.data, status: input.to },
   });
   if (result.count !== 1) throw new ExecutionError("INVALID_STATE_TRANSITION");
 }

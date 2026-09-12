@@ -19,6 +19,12 @@ export async function getTaskSnapshot(prisma: PrismaClient, taskId: string, user
     id: task.id,
     status: task.status,
     requestText: task.requestText,
+    planning: {
+      provider: task.agentProvider,
+      model: task.agentModel,
+      promptVersion: task.promptVersion,
+      errorCode: task.planningErrorCode,
+    },
     actions: task.actions.map((action) => ({
       id: action.id,
       sequence: action.sequence,

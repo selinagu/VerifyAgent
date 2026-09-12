@@ -7,11 +7,11 @@ export default function Home() {
         </p>
         <h1 className="text-5xl font-semibold tracking-tight">VerifyAgent</h1>
         <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-          The authorization pipeline is ready: deterministic policy, exact-action confirmation,
-          signed Persona verification, one-time grants, and auditable execution.
+          Natural-language requests now compile into strictly validated actions, then pass through
+          deterministic policy, exact-action confirmation, Persona verification, and auditable execution.
         </p>
         <div className="mt-8 inline-flex rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-sm font-medium text-emerald-200">
-          Phase 3 ready
+          Phase 4 ready
         </div>
       </section>
     </main>
