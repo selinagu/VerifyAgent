@@ -8,28 +8,30 @@ datasource db {
 }
 
 model User {
-  id          String       @id
-  displayName String
-  email       String?      @unique
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  sessions    UserSession[]
-  items       InventoryItem[]
-  tasks       TaskRun[]
-  listings    Listing[]
+  id            String                @id
+  displayName   String
+  email         String?               @unique
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  sessions      UserSession[]
+  items         InventoryItem[]
+  tasks         TaskRun[]
+  listings      Listing[]
   verifications VerificationSession[]
-  grants      AuthorizationGrant[]
+  grants        AuthorizationGrant[]
+  confirmations ActionConfirmation[]
 }
 
 model UserSession {
-  id            String       @id
+  id            String                @id
   userId        String
-  createdAt     DateTime     @default(now())
+  createdAt     DateTime              @default(now())
   expiresAt     DateTime
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks         TaskRun[]
   verifications VerificationSession[]
   grants        AuthorizationGrant[]
+  confirmations ActionConfirmation[]
 
   @@index([userId])
   @@index([expiresAt])
@@ -74,27 +76,28 @@ model TaskRun {
 }
 
 model ActionRun {
-  id              String       @id
-  taskId          String
-  sequence        Int
-  type            String
-  payloadJson     Json
-  dependsOnJson   Json         @default("[]")
-  rationale       String
-  status          String
-  requirement     String?
-  policyId        String?
-  policyVersion   Int?
-  reasonCode      String?
-  idempotencyKey  String       @unique
-  resultJson      Json?
-  errorCode       String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  task            TaskRun      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  verifications   VerificationSession[]
-  grants          AuthorizationGrant[]
-  auditEvents     AuditEvent[]
+  id             String                @id
+  taskId         String
+  sequence       Int
+  type           String
+  payloadJson    Json
+  dependsOnJson  Json                  @default("[]")
+  rationale      String
+  status         String
+  requirement    String?
+  policyId       String?
+  policyVersion  Int?
+  reasonCode     String?
+  idempotencyKey String                @unique
+  resultJson     Json?
+  errorCode      String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  task           TaskRun               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  verifications  VerificationSession[]
+  grants         AuthorizationGrant[]
+  auditEvents    AuditEvent[]
+  confirmation   ActionConfirmation?
 
   @@unique([taskId, sequence])
   @@index([taskId, status])
@@ -124,21 +127,21 @@ model Listing {
 }
 
 model VerificationSession {
-  id                  String       @id
-  userId              String
-  sessionId           String
-  actionId            String
-  personaInquiryId    String?      @unique
-  personaReferenceId  String       @unique
-  status              String
-  verifiedAt          DateTime?
-  expiresAt           DateTime?
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
-  user                User         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  session             UserSession  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  action              ActionRun    @relation(fields: [actionId], references: [id], onDelete: Cascade)
-  grant               AuthorizationGrant?
+  id                 String              @id
+  userId             String
+  sessionId          String
+  actionId           String
+  personaInquiryId   String?             @unique
+  personaReferenceId String              @unique
+  status             String
+  verifiedAt         DateTime?
+  expiresAt          DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  user               User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  session            UserSession         @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  action             ActionRun           @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  grant              AuthorizationGrant?
 
   @@index([userId, status])
   @@index([sessionId])
@@ -158,7 +161,7 @@ model AuthorizationGrant {
   consumedAt            DateTime?
   user                  User                @relation(fields: [userId], references: [id], onDelete: Restrict)
   session               UserSession         @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  action                ActionRun            @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  action                ActionRun           @relation(fields: [actionId], references: [id], onDelete: Cascade)
   verificationSession   VerificationSession @relation(fields: [verificationSessionId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
@@ -166,6 +169,24 @@ model AuthorizationGrant {
   @@index([actionId, status])
   @@index([scopeHash])
   @@index([expiresAt])
+}
+
+model ActionConfirmation {
+  id          String      @id
+  actionId    String      @unique
+  userId      String
+  sessionId   String
+  payloadHash String
+  decision    String
+  confirmedAt DateTime    @default(now())
+  createdAt   DateTime    @default(now())
+  action      ActionRun   @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  session     UserSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+
+  @@index([userId, decision])
+  @@index([sessionId])
+  @@index([payloadHash])
 }
 
 model AuditEvent {

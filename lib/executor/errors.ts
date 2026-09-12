@@ -16,6 +16,22 @@ export const EXECUTION_ERROR_CODES = [
   "LISTING_PRICE_REQUIRED",
   "CONCURRENT_MODIFICATION",
   "EXECUTION_FAILED",
+  "INVALID_STATE_TRANSITION",
+  "POLICY_DENIED",
+  "POLICY_CONTEXT_INVALID",
+  "CONFIRMATION_REQUIRED",
+  "IDENTITY_REQUIRED",
+  "ACTION_CHANGED",
+  "CONFIRMATION_REJECTED",
+  "GRANT_NOT_FOUND",
+  "GRANT_SCOPE_MISMATCH",
+  "GRANT_EXPIRED",
+  "GRANT_ALREADY_CONSUMED",
+  "GRANT_REVOKED",
+  "VERIFICATION_NOT_APPROVED",
+  "AUTH_CONTEXT_UNAVAILABLE",
+  "TASK_NOT_FOUND",
+  "TASK_NOT_RUNNABLE",
 ] as const;
 
 export type ExecutionErrorCode = (typeof EXECUTION_ERROR_CODES)[number];
@@ -38,12 +54,31 @@ const SAFE_MESSAGES: Record<ExecutionErrorCode, string> = {
   LISTING_PRICE_REQUIRED: "A valid price is required before publishing.",
   CONCURRENT_MODIFICATION: "The listing changed while the action was executing.",
   EXECUTION_FAILED: "The action could not be executed.",
+  INVALID_STATE_TRANSITION: "The requested state transition is not allowed.",
+  POLICY_DENIED: "The authorization policy denied this action.",
+  POLICY_CONTEXT_INVALID: "The action does not have enough valid context for authorization.",
+  CONFIRMATION_REQUIRED: "The action requires confirmation.",
+  IDENTITY_REQUIRED: "The action requires verified identity.",
+  ACTION_CHANGED: "The action changed and must be reviewed again.",
+  CONFIRMATION_REJECTED: "The action confirmation was rejected.",
+  GRANT_NOT_FOUND: "No matching identity grant was found.",
+  GRANT_SCOPE_MISMATCH: "The identity grant does not match the current action.",
+  GRANT_EXPIRED: "The identity grant has expired.",
+  GRANT_ALREADY_CONSUMED: "The identity grant has already been consumed.",
+  GRANT_REVOKED: "The identity grant has been revoked.",
+  VERIFICATION_NOT_APPROVED: "The linked identity verification is not approved.",
+  AUTH_CONTEXT_UNAVAILABLE: "No trusted authorization context is available.",
+  TASK_NOT_FOUND: "The requested task does not exist.",
+  TASK_NOT_RUNNABLE: "The task is not currently runnable.",
 };
 
 const RETRYABLE_CODES = new Set<ExecutionErrorCode>([
   "ACTION_ALREADY_EXECUTING",
   "CONCURRENT_MODIFICATION",
   "EXECUTION_FAILED",
+  "CONFIRMATION_REQUIRED",
+  "IDENTITY_REQUIRED",
+  "GRANT_NOT_FOUND",
 ]);
 
 export class ExecutionError extends Error {

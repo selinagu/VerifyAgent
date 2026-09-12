@@ -76,7 +76,7 @@ async function createAction(input: {
       payloadJson: input.payload,
       dependsOnJson: input.dependsOn ?? [],
       rationale: "Integration test action.",
-      status: input.status ?? "VALIDATED",
+      status: input.status ?? "AUTHORIZED",
       idempotencyKey: `test:${id}`,
     },
   });

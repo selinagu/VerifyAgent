@@ -13,6 +13,7 @@ export async function resetDemoNamespace(prisma: PrismaClient): Promise<void> {
     if (taskIds.length > 0) {
       await tx.auditEvent.deleteMany({ where: { taskId: { in: taskIds } } });
     }
+    await tx.actionConfirmation.deleteMany({ where: { userId: DEMO_IDS.userId } });
     await tx.authorizationGrant.deleteMany({ where: { userId: DEMO_IDS.userId } });
     await tx.verificationSession.deleteMany({ where: { userId: DEMO_IDS.userId } });
     if (taskIds.length > 0) {

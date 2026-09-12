@@ -35,7 +35,7 @@ async function createFixture(prisma: PrismaClient) {
             },
             dependsOnJson: [],
             rationale: "Prepare the ticket listing privately.",
-            status: "VALIDATED",
+            status: "AUTHORIZED",
             idempotencyKey: `demo:${taskId}:create`,
           },
           {
@@ -45,7 +45,7 @@ async function createFixture(prisma: PrismaClient) {
             payloadJson: { listingRef: `action:${createId}`, priceCents: 8_000, currency: "USD" },
             dependsOnJson: [`action:${createId}`],
             rationale: "Set the user-requested price.",
-            status: "VALIDATED",
+            status: "AUTHORIZED",
             idempotencyKey: `demo:${taskId}:price`,
           },
           {
@@ -55,7 +55,7 @@ async function createFixture(prisma: PrismaClient) {
             payloadJson: { listingRef: `action:${createId}` },
             dependsOnJson: [`action:${priceId}`],
             rationale: "Publish the completed listing.",
-            status: "VALIDATED",
+            status: "AUTHORIZED",
             idempotencyKey: `demo:${taskId}:publish`,
           },
         ],

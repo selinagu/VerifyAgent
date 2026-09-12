@@ -1,8 +1,11 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
-import { candidateActionSchema, type CandidateAction } from "@/lib/actions/schema";
+import type { CandidateAction } from "@/lib/actions/schema";
+import { parsePersistedAction } from "@/lib/actions/persisted-action";
 import { findActionForExecution } from "@/lib/actions/action-repository";
 import { appendAuditEvent } from "@/lib/audit/audit-service";
+import { consumeIdentityGrant } from "@/lib/authorization/grant-service";
+import { assertActionTransition } from "@/lib/state-machine/action-transitions";
 import { parseActionReference } from "./action-reference";
 import { ExecutionError, toExecutionError, type ExecutionErrorCode } from "./errors";
 import { handleCreateDraftListing } from "./handlers/create-draft-listing";
@@ -10,12 +13,6 @@ import { handlePublishListing } from "./handlers/publish-listing";
 import { handleSetListingPrice } from "./handlers/set-listing-price";
 import type { HandlerResult } from "./handlers/types";
 import type { ExecutionContext, ExecutionFailure, ExecutionResult } from "./types";
-
-const SUPPORTED_ACTIONS = new Set([
-  "CREATE_DRAFT_LISTING",
-  "SET_LISTING_PRICE",
-  "PUBLISH_LISTING",
-]);
 
 type PersistedAction = NonNullable<Awaited<ReturnType<typeof findActionForExecution>>>;
 
@@ -30,20 +27,6 @@ function failure(actionId: string, error: ExecutionError): ExecutionFailure {
 function jsonObject(value: Prisma.JsonValue | null): Record<string, unknown> {
   if (!value || Array.isArray(value) || typeof value !== "object") return {};
   return value as Record<string, unknown>;
-}
-
-function parsePersistedAction(action: PersistedAction): CandidateAction {
-  if (!SUPPORTED_ACTIONS.has(action.type)) throw new ExecutionError("UNSUPPORTED_ACTION");
-  const parsed = candidateActionSchema.safeParse({
-    type: action.type,
-    payload: action.payloadJson,
-    rationale: action.rationale,
-    dependsOn: action.dependsOnJson,
-  });
-  if (!parsed.success) {
-    throw new ExecutionError("INVALID_ACTION_PAYLOAD", { cause: parsed.error });
-  }
-  return parsed.data;
 }
 
 async function validateDependencies(
@@ -115,7 +98,7 @@ export class ActionExecutor {
     if (persisted.status === "EXECUTING") {
       return failure(actionId, new ExecutionError("ACTION_ALREADY_EXECUTING"));
     }
-    if (persisted.status !== "VALIDATED") {
+    if (persisted.status !== "AUTHORIZED") {
       return failure(actionId, new ExecutionError("ACTION_NOT_EXECUTABLE"));
     }
 
@@ -124,7 +107,7 @@ export class ActionExecutor {
       parsed = parsePersistedAction(persisted);
     } catch (error) {
       const safeError = toExecutionError(error);
-      await this.failValidatedAction(persisted, trustedContext, safeError);
+      await this.failAuthorizedAction(persisted, trustedContext, safeError);
       return failure(actionId, safeError);
     }
 
@@ -134,6 +117,18 @@ export class ActionExecutor {
     try {
       const handlerResult = await this.prisma.$transaction(async (tx) => {
         await validateDependencies(tx, persisted.taskId, persisted.sequence, parsed.dependsOn);
+        if (persisted.requirement === "VERIFIED_IDENTITY") {
+          const grantId = await consumeIdentityGrant(tx, persisted, trustedContext);
+          await appendAuditEvent(tx, {
+            taskId: persisted.taskId,
+            actionId: persisted.id,
+            actorType: "EXECUTOR",
+            eventType: "IDENTITY_GRANT_CONSUMED",
+            outcome: "SUCCEEDED",
+            correlationId: trustedContext.correlationId,
+            metadata: { grantId },
+          });
+        }
         const result = await dispatch(tx, persisted, parsed, trustedContext);
         const completed = await tx.actionRun.updateMany({
           where: { id: persisted.id, status: "EXECUTING" },
@@ -192,9 +187,10 @@ export class ActionExecutor {
   }
 
   private async claim(persisted: PersistedAction, context: ExecutionContext): Promise<boolean> {
+    assertActionTransition("AUTHORIZED", "EXECUTING");
     return this.prisma.$transaction(async (tx) => {
       const claim = await tx.actionRun.updateMany({
-        where: { id: persisted.id, status: "VALIDATED" },
+        where: { id: persisted.id, status: "AUTHORIZED" },
         data: { status: "EXECUTING", errorCode: null },
       });
       if (claim.count !== 1) return false;
@@ -225,14 +221,14 @@ export class ActionExecutor {
     return failure(actionId, new ExecutionError(code));
   }
 
-  private async failValidatedAction(
+  private async failAuthorizedAction(
     persisted: PersistedAction,
     context: ExecutionContext,
     error: ExecutionError,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const update = await tx.actionRun.updateMany({
-        where: { id: persisted.id, status: "VALIDATED" },
+        where: { id: persisted.id, status: "AUTHORIZED" },
         data: { status: "FAILED", errorCode: error.code },
       });
       if (update.count !== 1) return;
@@ -272,6 +268,28 @@ export class ActionExecutor {
     error: ExecutionError,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      if (persisted.requirement === "VERIFIED_IDENTITY") {
+        const revoked = await tx.authorizationGrant.updateMany({
+          where: {
+            actionId: persisted.id,
+            userId: context.userId,
+            sessionId: context.sessionId,
+            status: "ACTIVE",
+          },
+          data: { status: "REVOKED" },
+        });
+        if (revoked.count > 0) {
+          await appendAuditEvent(tx, {
+            taskId: persisted.taskId,
+            actionId: persisted.id,
+            actorType: "EXECUTOR",
+            eventType: "IDENTITY_GRANT_REVOKED",
+            outcome: "REVOKED",
+            reasonCode: error.code,
+            correlationId: context.correlationId,
+          });
+        }
+      }
       await tx.actionRun.updateMany({
         where: { id: persisted.id, status: "EXECUTING" },
         data: { status: "FAILED", errorCode: error.code },
