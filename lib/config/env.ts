@@ -15,6 +15,7 @@ export const envSchema = z.object({
   PERSONA_WEBHOOK_SECRET: optionalSecret,
   PERSONA_ENVIRONMENT_ID: optionalSecret,
   PERSONA_TEMPLATE_ID: optionalSecret,
+  PERSONA_API_VERSION: z.string().min(1).default("2025-10-27"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
@@ -27,7 +28,11 @@ export function configurationFlags(env: AppEnv) {
   return {
     llmConfigured: Boolean(env.LLM_PROVIDER && env.LLM_API_KEY && env.LLM_MODEL),
     personaConfigured: Boolean(
-      env.PERSONA_API_KEY && env.PERSONA_ENVIRONMENT_ID && env.PERSONA_TEMPLATE_ID,
+      env.PERSONA_API_KEY &&
+        env.PERSONA_WEBHOOK_SECRET &&
+        env.PERSONA_ENVIRONMENT_ID &&
+        env.PERSONA_TEMPLATE_ID &&
+        env.PERSONA_API_VERSION,
     ),
   };
 }

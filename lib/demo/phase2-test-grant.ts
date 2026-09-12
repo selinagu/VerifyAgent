@@ -44,6 +44,7 @@ export async function issuePhase2TestGrant(
         sessionId: input.sessionId,
         actionId: action.id,
         personaReferenceId: `phase2_demo_${randomUUID()}`,
+        scopeHash,
         status: "APPROVED",
         verifiedAt: new Date(),
         expiresAt,

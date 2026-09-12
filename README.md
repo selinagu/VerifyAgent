@@ -12,7 +12,7 @@ user request
   -> append-only audit trail
 ```
 
-This repository currently contains **Phase 0 through Phase 2**: project infrastructure, canonical contracts, persistent domain models, an idempotent marketplace executor, deterministic authorization policy, pause/resume orchestration, confirmation evidence, and one-time identity-grant enforcement. Persona itself, the LLM planner, and the Agent Workspace remain intentionally absent.
+This repository currently contains **Phase 0 through Phase 3**: project infrastructure, canonical contracts, persistent domain models, an idempotent marketplace executor, deterministic authorization policy, pause/resume orchestration, confirmation evidence, and a real Persona sandbox verification boundary. The LLM planner and full Agent Workspace remain intentionally absent.
 
 ## Security invariants
 
@@ -52,8 +52,10 @@ lib/demo/               Stable demo fixture identifiers
 lib/marketplace/        Listing invariants and transactional mutations
 lib/orchestrator/       Restart-safe task runner
 lib/policy/             Pure deterministic policy engine and DB context builder
+lib/persona/            Persona API adapter, event parser, and webhook signature verification
 lib/state-machine/      Explicit action/task transition graphs and CAS updates
 lib/tasks/              Safe task snapshots
+lib/verification/       Verification lifecycle, webhook processing, and grant issuance
 prisma/                 Database schema, migration, and seed
 scripts/                Repeatable Phase 1 executor demo
 tests/                  Contract, configuration, migration, and seed tests
@@ -87,11 +89,12 @@ pnpm db:migrate:dev  # Create a development migration after schema changes
 pnpm db:seed          # Reset and seed the demo namespace
 pnpm demo:phase1      # Run draft -> set $80 -> publish through the executor
 pnpm demo:phase2      # Run policy -> confirmation -> test grant -> publish
+pnpm demo:phase3      # Run a signed fake-Persona end-to-end flow without network
 ```
 
 ## Environment
 
-Copy `.env.example` to `.env`. Phases 0–2 require `DATABASE_URL`; set `DEMO_MODE=true` only for local demo APIs. LLM and Persona variables are optional and must remain server-side secrets. Do not prefix API keys or webhook secrets with `NEXT_PUBLIC_`.
+Copy `.env.example` to `.env`. All phases require `DATABASE_URL`; set `DEMO_MODE=true` only for local demo APIs. Persona variables are optional until the real sandbox flow is used and must remain server-side secrets. Do not prefix API keys or webhook secrets with `NEXT_PUBLIC_`.
 
 ## Demo seed
 
@@ -197,12 +200,89 @@ pnpm demo:phase2
 
 The demo resets only the stable demo namespace, creates three validated actions, runs through the `NONE` action, approves the price confirmation, issues a clearly marked demo-only identity grant, resumes publishing, and prints the completed listing and audit summary.
 
+## Phase 3 Persona integration
+
+Phase 3 replaces simulated identity evidence with a server-created Persona inquiry and an authoritative approval path:
+
+```text
+WAITING_IDENTITY
+  -> server pre-creates Persona inquiry
+  -> Embedded Flow collects identity evidence
+  -> raw-body webhook signature verification
+  -> server retrieves current inquiry state
+  -> exact action scope revalidated
+  -> short-lived one-time grant issued
+  -> existing runner resumes and executor consumes grant
+```
+
+The browser callback is deliberately non-authoritative. It only changes UI copy while the page polls VerifyAgent's safe verification endpoint. Publishing remains blocked until a signed `inquiry.approved` event is received, the inquiry is retrieved through Persona's server API, and its opaque reference ID matches the stored verification.
+
+Persona recommends pre-creating inquiries on the server for production integrations and using webhooks rather than client callbacks for current state. This implementation pins server API version `2025-10-27` and Embedded SDK `5.8.0`; review Persona's official [pre-created Embedded Flow guide](https://docs.withpersona.com/tutorial-embedded-flow-precreate), [client callback warning](https://docs.withpersona.com/embedded-flow-client-callbacks), and [webhook practices](https://docs.withpersona.com/webhooks-best-practices) before upgrading either contract.
+
+### Persona sandbox setup
+
+1. In the Persona Dashboard, switch to Sandbox and create or select an active Inquiry Template.
+2. Create a Sandbox API key with inquiry create/read/resume access.
+3. Create a webhook for inquiry lifecycle events and point it to `https://<public-host>/api/webhooks/persona`.
+4. Configure at least `inquiry.approved`, `inquiry.declined`, `inquiry.failed`, and `inquiry.expired`; `created`, `started`, and `completed` are also supported.
+5. Copy the webhook-specific signing secret, environment ID, and template ID into the server-side environment variables below.
+6. In template security settings, block client-side inquiry creation because VerifyAgent pre-creates every inquiry.
+7. For local development, expose the Next.js server through an HTTPS tunnel and use its stable HTTPS webhook URL. No particular tunnel provider is required.
+
+```dotenv
+PERSONA_API_KEY="..."
+PERSONA_WEBHOOK_SECRET="..."
+PERSONA_ENVIRONMENT_ID="env_..."
+PERSONA_TEMPLATE_ID="itmpl_..."
+PERSONA_API_VERSION="2025-10-27"
+```
+
+Never commit these values. The health endpoint reports only whether the complete Persona configuration is present.
+
+### Real sandbox flow
+
+First drive a task to `WAITING_IDENTITY`, then start verification:
+
+```text
+POST /api/actions/:actionId/verification/start   body: {}
+```
+
+The response includes a local `verificationUrl` and only the short-lived flow data required by the Persona client. Open `/verify/:verificationId` to complete the Embedded Flow. The page waits for the signed webhook, then calls the existing resume endpoint only after the safe verification snapshot reports an active grant.
+
+Additional Phase 3 endpoints:
+
+```text
+GET  /api/verifications/:verificationId
+POST /api/webhooks/persona
+```
+
+The verification query never returns Persona attributes, identity documents, reference IDs, scope hashes, webhook payloads, grants, or secrets. Webhook storage contains only event identifiers, type, inquiry ID, timestamps, processing status, and a hash of the raw payload. Duplicate delivery is idempotent and older out-of-order events cannot overwrite newer state.
+
+### Fake integration flow
+
+The complete Persona boundary can be exercised without credentials or network access:
+
+```bash
+pnpm demo:phase3
+pnpm test -- tests/verification/phase3.integration.test.ts
+```
+
+The fake demo still signs and verifies a Persona-shaped raw webhook, performs authoritative retrieval through an injected fake gateway, issues and consumes the grant, and publishes the listing. It is clearly separate from the real Sandbox integration and is never used by production Persona routes.
+
+### Failure and recovery
+
+- Missing Persona configuration or upstream timeouts leave the action in `WAITING_IDENTITY`.
+- Declined, failed, expired, or cancelled verification never creates a grant; the user may start a new verification attempt while the task remains safely paused.
+- If the action changes after verification starts, the verification becomes `FAILED` with `VERIFICATION_ACTION_CHANGED` and cannot authorize the new payload.
+- Duplicate webhooks return success without duplicate grants or audit effects.
+- Failed webhook processing remains retryable; the same event can be processed again after an upstream recovery.
+- If publish execution fails after authorization, the one-time grant is revoked by the executor.
+
 ## Phase boundary
 
-The next step is **Phase 3: Persona integration**. It will replace the demo-only identity grant issuer with server-created Persona inquiries and verified webhook/API evidence while preserving the Phase 2 grant boundary.
+The next step is **Phase 4: LLM planning**. It will convert user requests into strictly validated candidate action plans while preserving policy, verification, and executor authority boundaries.
 
 Still intentionally absent:
 
-- Persona SDK, API, and webhooks;
 - LLM planning;
 - Agent Workspace and marketplace UI.

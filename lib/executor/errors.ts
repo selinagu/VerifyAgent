@@ -32,6 +32,19 @@ export const EXECUTION_ERROR_CODES = [
   "AUTH_CONTEXT_UNAVAILABLE",
   "TASK_NOT_FOUND",
   "TASK_NOT_RUNNABLE",
+  "PERSONA_NOT_CONFIGURED",
+  "PERSONA_REQUEST_FAILED",
+  "PERSONA_RESPONSE_INVALID",
+  "PERSONA_WEBHOOK_SIGNATURE_MISSING",
+  "PERSONA_WEBHOOK_SIGNATURE_INVALID",
+  "PERSONA_EVENT_INVALID",
+  "PERSONA_EVENT_DUPLICATE",
+  "VERIFICATION_NOT_FOUND",
+  "VERIFICATION_NOT_STARTABLE",
+  "VERIFICATION_ALREADY_TERMINAL",
+  "VERIFICATION_ACTION_CHANGED",
+  "VERIFICATION_EXPIRED",
+  "INQUIRY_BINDING_MISMATCH",
 ] as const;
 
 export type ExecutionErrorCode = (typeof EXECUTION_ERROR_CODES)[number];
@@ -70,6 +83,19 @@ const SAFE_MESSAGES: Record<ExecutionErrorCode, string> = {
   AUTH_CONTEXT_UNAVAILABLE: "No trusted authorization context is available.",
   TASK_NOT_FOUND: "The requested task does not exist.",
   TASK_NOT_RUNNABLE: "The task is not currently runnable.",
+  PERSONA_NOT_CONFIGURED: "Persona verification is not configured.",
+  PERSONA_REQUEST_FAILED: "Persona verification is temporarily unavailable.",
+  PERSONA_RESPONSE_INVALID: "Persona returned an invalid response.",
+  PERSONA_WEBHOOK_SIGNATURE_MISSING: "The Persona webhook signature is missing.",
+  PERSONA_WEBHOOK_SIGNATURE_INVALID: "The Persona webhook signature is invalid.",
+  PERSONA_EVENT_INVALID: "The Persona webhook event is invalid.",
+  PERSONA_EVENT_DUPLICATE: "The Persona webhook event was already processed.",
+  VERIFICATION_NOT_FOUND: "The requested verification does not exist.",
+  VERIFICATION_NOT_STARTABLE: "Identity verification cannot be started for this action.",
+  VERIFICATION_ALREADY_TERMINAL: "The identity verification has already finished.",
+  VERIFICATION_ACTION_CHANGED: "The action changed after identity verification started.",
+  VERIFICATION_EXPIRED: "The identity verification has expired.",
+  INQUIRY_BINDING_MISMATCH: "The Persona inquiry does not match this verification.",
 };
 
 const RETRYABLE_CODES = new Set<ExecutionErrorCode>([

@@ -8,8 +8,23 @@ export async function resetDemoNamespace(prisma: PrismaClient): Promise<void> {
     select: { id: true },
   });
   const taskIds = demoTasks.map(({ id }) => id);
+  const demoVerifications = await prisma.verificationSession.findMany({
+    where: { userId: DEMO_IDS.userId },
+    select: { personaInquiryId: true },
+  });
+  const inquiryIds = demoVerifications.flatMap(({ personaInquiryId }) =>
+    personaInquiryId ? [personaInquiryId] : [],
+  );
 
   await prisma.$transaction(async (tx) => {
+    await tx.personaWebhookEvent.deleteMany({
+      where: {
+        OR: [
+          { inquiryId: { startsWith: "inq_demo_" } },
+          ...(inquiryIds.length > 0 ? [{ inquiryId: { in: inquiryIds } }] : []),
+        ],
+      },
+    });
     if (taskIds.length > 0) {
       await tx.auditEvent.deleteMany({ where: { taskId: { in: taskIds } } });
     }

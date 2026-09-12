@@ -12,6 +12,7 @@ describe("health snapshot", () => {
       LLM_API_KEY: "llm-secret",
       LLM_MODEL: "example-model",
       PERSONA_API_KEY: "persona-secret",
+      PERSONA_WEBHOOK_SECRET: "persona-webhook-secret",
       PERSONA_ENVIRONMENT_ID: "env_example",
       PERSONA_TEMPLATE_ID: "itmpl_example",
     });
