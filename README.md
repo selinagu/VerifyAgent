@@ -12,7 +12,7 @@ user request
   -> append-only audit trail
 ```
 
-This repository currently contains **Phase 0 only**: project infrastructure, canonical contracts, persistent domain models, validated configuration, demo seed data, and tests. It intentionally does not yet implement the agent, policy engine, Persona flow, executor, or marketplace mutations.
+This repository currently contains **Phase 0 and Phase 1**: project infrastructure, canonical contracts, persistent domain models, validated configuration, and an idempotent marketplace executor. It intentionally does not yet implement the agent, policy engine, confirmation flow, Persona integration, or Agent Workspace.
 
 ## Security invariants
 
@@ -41,11 +41,15 @@ Node.js 22.5 or newer is required. The migration smoke test uses Node's built-in
 ```text
 app/                    Minimal application and health endpoint
 lib/actions/            Canonical action schemas and display catalog
+lib/audit/              Append-only audit writer
 lib/config/             Environment validation
 lib/domain/             Shared status schemas and inferred types
+lib/executor/           Execution boundary, dispatcher, handlers, and safe errors
 lib/health/             Non-sensitive health reporting
 lib/demo/               Stable demo fixture identifiers
+lib/marketplace/        Listing invariants and transactional mutations
 prisma/                 Database schema, migration, and seed
+scripts/                Repeatable Phase 1 executor demo
 tests/                  Contract, configuration, migration, and seed tests
 ```
 
@@ -75,6 +79,7 @@ pnpm db:generate     # Generate the Prisma client
 pnpm db:migrate      # Apply committed migrations
 pnpm db:migrate:dev  # Create a development migration after schema changes
 pnpm db:seed          # Reset and seed the demo namespace
+pnpm demo:phase1      # Run draft -> set $80 -> publish through the executor
 ```
 
 ## Environment
@@ -92,6 +97,58 @@ The repeatable seed creates:
 
 It is designed for the future prompt: `Sell my concert ticket for $80.`
 
+## Phase 1 executor
+
+Phase 1 implements a single capability boundary:
+
+```text
+persisted VALIDATED ActionRun
+  -> ownership and session checks
+  -> strict Zod re-validation
+  -> atomic execution claim
+  -> dependency/reference resolution
+  -> action-specific handler
+  -> transactional mutation + result + success audit
+```
+
+The supported handlers are:
+
+- `CREATE_DRAFT_LISTING`: validates inventory ownership and creates a private draft.
+- `SET_LISTING_PRICE`: resolves a same-task draft result, sets USD cents, and increments the listing version.
+- `PUBLISH_LISTING`: requires a complete, priced draft and performs `DRAFT -> PUBLISHED`.
+
+The executor receives an `ActionRun` ID, reloads all authoritative data from the database, and never trusts caller-supplied ownership, status, result, or idempotency values. Logical listing references may only resolve successful `CREATE_DRAFT_LISTING` actions in the same task.
+
+### Idempotency, concurrency, and audit
+
+- A conditional `VALIDATED -> EXECUTING` update atomically claims execution.
+- A successful retry replays the persisted result without repeating the mutation.
+- Listing mutations use version-based compare-and-swap updates.
+- The business mutation, persisted action result, domain audit event, and success audit event commit in one Prisma transaction.
+- A failed transaction rolls back the marketplace mutation; a separate failure transaction records a safe error code without a false success event.
+- Audit metadata excludes secrets and sensitive identity data.
+
+SQLite serializes writes, but the explicit action claim and listing version checks preserve the intended boundary when the project later moves to a multi-writer database.
+
+### Phase 1 demo
+
+```bash
+pnpm db:migrate
+pnpm demo:phase1
+```
+
+The command resets only the demo namespace, creates a task with three validated fixture actions, and sends all three through `ActionExecutor`. The expected final listing is `$80 USD`, `PUBLISHED`, version `3`, with all actions `SUCCEEDED` and nine audit events.
+
+`VALIDATED` is a temporary Phase 1 integration seam, not proof of user authorization. The executor does not yet check policy decisions, confirmations, or Persona grants. Those controls must be placed before this capability boundary in later phases.
+
 ## Phase boundary
 
-The next step is **Phase 1: Marketplace domain and executor**. Phase 1 should introduce transactional, idempotent listing mutations and audit writes. It must not be implemented until the Phase 0 contracts, migration, seed, tests, lint, typecheck, and production build are green.
+The next step is **Phase 2: Policy engine and orchestrator**. It will introduce deterministic `NONE / CONFIRM / VERIFIED_IDENTITY` decisions and pause/resume state transitions. Phase 2 has not been implemented here.
+
+Still intentionally absent:
+
+- deterministic policy evaluation;
+- confirmation and authorization grants;
+- Persona SDK, API, and webhooks;
+- LLM planning;
+- Agent Workspace and marketplace UI.

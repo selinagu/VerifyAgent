@@ -79,6 +79,7 @@ model ActionRun {
   sequence        Int
   type            String
   payloadJson     Json
+  dependsOnJson   Json         @default("[]")
   rationale       String
   status          String
   requirement     String?

@@ -18,6 +18,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "demo:phase1": "tsx scripts/demo-phase1.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
