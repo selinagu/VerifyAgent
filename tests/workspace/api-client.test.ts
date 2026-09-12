@@ -30,4 +30,22 @@ describe("workspace API client", () => {
     const malformedTask = vi.fn(async () => Response.json({ status: "COMPLETED", actions: "not-an-array" }));
     await expect(createWorkspaceApi(malformedTask as typeof fetch).task("task")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
   });
+
+  it("renders a valid blocked readiness snapshot returned with 503", async () => {
+    const blocked = {
+      status: "blocked",
+      profile: "incomplete",
+      checks: {
+        database: "ready",
+        plannerConfiguration: "missing",
+        personaConfiguration: "missing",
+        webhookConfiguration: "missing",
+        demoMode: "enabled",
+      },
+    };
+    const fetcher = vi.fn(async () => Response.json(blocked, { status: 503, headers: { "X-Request-ID": "request-test-123" } }));
+    const requestIds: string[] = [];
+    await expect(createWorkspaceApi(fetcher as typeof fetch, (value) => requestIds.push(value)).readiness()).resolves.toEqual(blocked);
+    expect(requestIds).toEqual(["request-test-123"]);
+  });
 });

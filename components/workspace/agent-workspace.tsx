@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { createWorkspaceApi, ApiClientError } from "@/lib/client/api-client";
-import type { DemoContext, HealthSnapshot, TaskActionSnapshot, TaskSnapshot } from "@/lib/client/contracts";
+import type { DemoContext, ReadinessSnapshot, TaskActionSnapshot, TaskSnapshot } from "@/lib/client/contracts";
 import { requestAttempt, type RequestAttempt, viewStateForTask } from "@/lib/client/task-controller";
 import { ActionTimeline } from "./action-timeline";
 import { AuditTrail } from "./audit-trail";
@@ -20,11 +20,12 @@ function errorDetails(error: unknown) {
 }
 
 export function AgentWorkspace() {
-  const api = useMemo(() => createWorkspaceApi(), []);
+  const [requestId, setRequestId] = useState<string>();
+  const api = useMemo(() => createWorkspaceApi(fetch, setRequestId), []);
   const generation = useRef(0);
   const attempt = useRef<RequestAttempt | undefined>(undefined);
   const [context, setContext] = useState<DemoContext>();
-  const [health, setHealth] = useState<HealthSnapshot>();
+  const [readiness, setReadiness] = useState<ReadinessSnapshot>();
   const [prompt, setPrompt] = useState("Sell my concert ticket for $80.");
   const [task, setTask] = useState<TaskSnapshot>();
   const [busy, setBusy] = useState<string>();
@@ -52,9 +53,9 @@ export function AgentWorkspace() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void Promise.allSettled([api.health(), api.demoContext()]).then(([healthResult, contextResult]) => {
+    void Promise.allSettled([api.readiness(), api.demoContext()]).then(([readinessResult, contextResult]) => {
       if (controller.signal.aborted) return;
-      if (healthResult.status === "fulfilled") setHealth(healthResult.value);
+      if (readinessResult.status === "fulfilled") setReadiness(readinessResult.value);
       if (contextResult.status === "fulfilled") {
         setContext(contextResult.value);
         setPrompt(contextResult.value.defaultPrompt);
@@ -134,12 +135,22 @@ export function AgentWorkspace() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`status-pill ${health?.status === "ok" ? "status-good" : "status-muted"}`}><i />{health?.status === "ok" ? "System ready" : "Checking system"}</span>
-            <span className={`status-pill ${health?.llmConfigured ? "status-good" : "status-warn"}`}><i />Planner {health?.llmConfigured ? "ready" : "needs config"}</span>
-            <span className={`status-pill ${health?.personaConfigured ? "status-good" : "status-warn"}`}><i />Persona {health?.personaConfigured ? "ready" : "needs config"}</span>
+            <span className={`status-pill ${readiness?.checks.database === "ready" ? "status-good" : "status-muted"}`}><i />{readiness?.checks.database === "ready" ? "System ready" : "Checking system"}</span>
+            <span className={`status-pill ${readiness?.checks.plannerConfiguration === "ready" ? "status-good" : "status-warn"}`}><i />Planner {readiness?.checks.plannerConfiguration === "ready" ? "ready" : "needs config"}</span>
+            <span className={`status-pill ${readiness?.checks.personaConfiguration === "ready" ? "status-good" : "status-warn"}`}><i />Persona {readiness?.checks.personaConfiguration === "ready" ? "ready" : "needs config"}</span>
             {context?.demoMode && <button type="button" className="text-button" disabled={Boolean(busy)} onClick={reset}>Reset demo</button>}
           </div>
         </header>
+
+        <details className="mb-6 rounded-2xl border border-slate-800 bg-slate-950/45 px-5 py-3 text-xs text-slate-400">
+          <summary className="cursor-pointer font-semibold text-slate-300">Readiness · {readiness?.status ?? "checking"} · {readiness?.profile ?? "incomplete"}</summary>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+            <span>Database: {readiness?.checks.database ?? "checking"}</span>
+            <span>Webhook: {readiness?.checks.webhookConfiguration ?? "checking"}</span>
+            <span>Demo mode: {readiness?.checks.demoMode ?? "checking"}</span>
+            {requestId && <span className="break-all font-mono">Request ID: {requestId}</span>}
+          </div>
+        </details>
 
         <section className="hero-panel mb-6 overflow-hidden p-6 sm:p-8">
           <div className="relative z-10 max-w-3xl">
@@ -188,6 +199,11 @@ export function AgentWorkspace() {
                     <span>Model: {task.planning.model ?? "—"}</span><span>·</span>
                     <span>Prompt: {task.planning.promptVersion ?? "—"}</span>
                   </div>
+                  {task.status === "COMPLETED" && (
+                    <p className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.07] px-4 py-3 text-sm text-emerald-200">
+                      Published after verified identity · exact-action grant consumed · marketplace version 3
+                    </p>
+                  )}
                 </section>
                 <AuthorizationCard task={task} busy={Boolean(busy)} onConfirm={confirm} onVerify={verify} />
                 <ActionTimeline actions={task.actions} />
@@ -197,6 +213,14 @@ export function AgentWorkspace() {
           <MarketplacePreview context={context} task={task} />
         </div>
         {task && <div className="mt-6"><AuditTrail audit={task.audit} actions={task.actions} /></div>}
+        <details className="panel mt-6 p-6">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-200">Two-minute demo guide</summary>
+          <ol className="mt-4 grid gap-3 text-sm text-slate-400 md:grid-cols-3">
+            <li><strong className="text-cyan-200">1 · Plan</strong><br />Submit the $80 request and show typed actions.</li>
+            <li><strong className="text-amber-200">2 · Authorize</strong><br />Run, confirm the price, then reach Persona.</li>
+            <li><strong className="text-emerald-200">3 · Prove</strong><br />Verify, publish, and finish on the audit trail.</li>
+          </ol>
+        </details>
         <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800/80 py-6 text-xs text-slate-600">
           <span>LLM proposes · policy authorizes · executor mutates</span>
           <span>Persona browser completion is never authoritative</span>

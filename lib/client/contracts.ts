@@ -66,4 +66,16 @@ export type HealthSnapshot = {
   personaConfigured: boolean;
 };
 
+export type ReadinessSnapshot = {
+  status: "ready" | "degraded" | "blocked";
+  profile: "offline-success" | "real-sandbox" | "failure-demo" | "incomplete";
+  checks: {
+    database: string;
+    plannerConfiguration: string;
+    personaConfiguration: string;
+    webhookConfiguration: string;
+    demoMode: string;
+  };
+};
+
 export type VerificationStart = { verificationId: string; verificationUrl: string; status: string };

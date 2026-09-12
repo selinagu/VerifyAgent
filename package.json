@@ -23,6 +23,9 @@
     "demo:phase3": "tsx scripts/demo-phase3.ts",
     "demo:phase4": "tsx scripts/demo-phase4.ts",
     "demo:phase5": "npm run demo:phase4 && vitest run tests/workspace --reporter=verbose",
+    "demo:success": "tsx scripts/demo-phase4.ts",
+    "demo:failure": "tsx scripts/demo-failure.ts",
+    "doctor": "tsx scripts/integration-doctor.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

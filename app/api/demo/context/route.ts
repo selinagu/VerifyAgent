@@ -3,8 +3,10 @@ import { db } from "@/lib/db";
 import { assertDemoApiEnabled } from "@/lib/demo/demo-api";
 import { DEMO_IDS, DEMO_PROMPT } from "@/lib/demo/fixtures";
 import { apiErrorResponse } from "@/lib/http/api-response";
+import { observeApiRequest } from "@/lib/observability/correlation";
 
-export async function GET() {
+export async function GET(request: Request) {
+ return observeApiRequest(request, "/api/demo/context", async () => {
   try {
     const env = parseEnv();
     assertDemoApiEnabled(env);
@@ -17,4 +19,5 @@ export async function GET() {
   } catch (error) {
     return apiErrorResponse(error);
   }
+ });
 }

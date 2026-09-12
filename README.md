@@ -12,7 +12,7 @@ user request
   -> append-only audit trail
 ```
 
-This repository currently contains **Phase 0 through Phase 5**: project infrastructure, canonical contracts, persistent domain models, an idempotent marketplace executor, deterministic authorization policy, pause/resume orchestration, confirmation evidence, a real Persona sandbox verification boundary, a fail-closed LLM planning boundary, and a complete Agent Workspace for the hackathon demo.
+This repository contains **Phase 0 through Phase 6**: the complete hackathon MVP plus readiness diagnostics, hardened mutation boundaries, correlation-safe logging, security headers, explicit success/failure demos, and release runbooks.
 
 ## Security invariants
 
@@ -49,6 +49,9 @@ lib/authorization/      Confirmation evidence and identity-grant validation
 lib/executor/           Execution boundary, dispatcher, handlers, and safe errors
 lib/http/               Strict API request and safe error contracts
 lib/health/             Non-sensitive health reporting
+lib/readiness/          Release and integration readiness reporting
+lib/observability/      Correlation IDs, structured logging, and redaction
+lib/security/           CSP and browser security headers
 lib/demo/               Stable demo fixture identifiers
 lib/marketplace/        Listing invariants and transactional mutations
 lib/orchestrator/       Restart-safe task runner
@@ -96,6 +99,10 @@ pnpm demo:phase2      # Run policy -> confirmation -> test grant -> publish
 pnpm demo:phase3      # Run a signed fake-Persona end-to-end flow without network
 pnpm demo:phase4      # Plan from natural language, authorize, verify, and publish without network
 pnpm demo:phase5      # Run the full Phase 4 flow plus Workspace contract smoke tests
+pnpm demo:success     # Run the deterministic happy-path release demo
+pnpm demo:failure     # Prove decline, duplicate delivery, and fail-closed behavior
+pnpm doctor           # Check local integration readiness without network calls
+pnpm doctor -- --live # Validate configured OpenAI access; skips missing integrations
 ```
 
 ## Environment
@@ -347,9 +354,21 @@ pnpm demo:phase5
 
 This runs the signed fake-Persona end-to-end flow and the Workspace API, state-mapping, formatting, reset-boundary, and malformed-response smoke tests.
 
-## Phase boundary
+## Phase 6 release readiness
 
-The hackathon MVP is now complete through **Phase 5**. Possible stretch work includes task history, audit filters, a guided demo overlay, production authentication, deployment, and a real marketplace adapter.
+Phase 6 keeps the product boundary unchanged and makes it safe and repeatable to demonstrate. `GET /api/readiness` reports only categorical checks and returns `503` when a database or planner requirement blocks operation. `pnpm doctor` checks Node, environment parsing, migrations, database access, profile selection, and integration flags without printing credentials or making network requests. Add `--live` only when intentionally validating configured OpenAI access; Persona is reported as `SKIPPED` because inquiry creation is side-effecting.
+
+All JSON mutations require `application/json`, strict schemas, and a 16 KiB body limit. Production browser mutations also require an exact same-origin `Origin` header. The Persona webhook retains its separate raw-body signature boundary and uses a 256 KiB limit. Every API response carries `X-Request-ID`; logs contain route, method, status, duration, and outcome after recursive secret redaction.
+
+The production CSP allowlists the pinned Persona SDK and inquiry surfaces, disables objects and external framing, and excludes `unsafe-eval`. Review [Persona embedded-flow security](https://docs.withpersona.com/2023-01-05/embedded-flow-security), [CSP troubleshooting](https://docs.withpersona.com/embedded-flow-troubleshooting-common-issues), and [webhook best practices](https://docs.withpersona.com/webhooks-best-practices) before changing these boundaries.
+
+Use the operational documents in `docs/`:
+
+- `real-sandbox-runbook.md` for a controlled OpenAI + Persona Sandbox verification;
+- `demo-runbook.md` for the judge-facing happy path and fail-closed backup;
+- `release-checklist.md` for the final regression and secret-safety gate.
+
+The hackathon MVP is complete through **Phase 6**. Possible stretch work includes task history, audit filters, production authentication, deployment, and a real marketplace adapter.
 
 Still intentionally absent:
 

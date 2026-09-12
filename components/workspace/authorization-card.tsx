@@ -10,6 +10,9 @@ type Props = {
 
 export function AuthorizationCard({ task, busy, onConfirm, onVerify }: Props) {
   const waiting = task.actions.find((action) => action.status === task.status);
+  const verificationFailure = [...task.audit].reverse().find((event) =>
+    ["IDENTITY_VERIFICATION_DECLINED", "IDENTITY_VERIFICATION_FAILED", "IDENTITY_VERIFICATION_EXPIRED"].includes(event.eventType),
+  );
   if (task.status === "WAITING_CONFIRMATION" && waiting) {
     return (
       <section className="rounded-3xl border border-amber-300/25 bg-amber-300/[0.07] p-6" aria-labelledby="confirmation-heading">
@@ -29,6 +32,11 @@ export function AuthorizationCard({ task, busy, onConfirm, onVerify }: Props) {
         <p className="eyebrow text-violet-300">Verified human required</p>
         <h2 id="identity-heading" className="mt-2 text-xl font-semibold text-white">Authorize public publishing</h2>
         <p className="mt-3 text-sm leading-6 text-slate-300">Publishing publicly represents you. Persona verifies the human; the signed server webhook authorizes only this exact action.</p>
+        {verificationFailure && (
+          <p className="mt-4 rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
+            Previous verification did not approve. No grant was issued; the listing remains private. You may start a new Sandbox attempt.
+          </p>
+        )}
         <button type="button" className="primary-button mt-5 bg-violet-300 hover:bg-violet-200" disabled={busy} onClick={() => onVerify(waiting)}>Verify identity with Persona</button>
       </section>
     );

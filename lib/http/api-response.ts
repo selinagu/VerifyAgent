@@ -38,6 +38,9 @@ const STATUS_BY_CODE: Partial<Record<ExecutionError["code"], number>> = {
   PLAN_RESOURCE_OWNERSHIP_MISMATCH: 404,
   PLAN_PRICE_MISMATCH: 422,
   PLANNING_IDEMPOTENCY_CONFLICT: 409,
+  REQUEST_ORIGIN_INVALID: 403,
+  REQUEST_TOO_LARGE: 413,
+  UNSUPPORTED_MEDIA_TYPE: 415,
 };
 
 export function apiErrorResponse(error: unknown) {

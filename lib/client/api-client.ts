@@ -1,4 +1,4 @@
-import type { ApiErrorBody, DemoContext, HealthSnapshot, TaskSnapshot, VerificationStart } from "./contracts";
+import type { ApiErrorBody, DemoContext, HealthSnapshot, ReadinessSnapshot, TaskSnapshot, VerificationStart } from "./contracts";
 
 export class ApiClientError extends Error {
   constructor(
@@ -12,20 +12,28 @@ export class ApiClientError extends Error {
   }
 }
 
-async function requestJson<T>(fetcher: typeof fetch, url: string, init?: RequestInit): Promise<T> {
+async function requestJson<T>(
+  fetcher: typeof fetch,
+  url: string,
+  init?: RequestInit,
+  onRequestId?: (requestId: string) => void,
+  acceptedStatuses: readonly number[] = [],
+): Promise<T> {
   let response: Response;
   try {
     response = await fetcher(url, { cache: "no-store", ...init });
   } catch {
     throw new ApiClientError("NETWORK_ERROR", "VerifyAgent could not reach the server.", true);
   }
+  const requestId = response.headers.get("x-request-id");
+  if (requestId) onRequestId?.(requestId);
   let body: unknown;
   try {
     body = await response.json();
   } catch {
     throw new ApiClientError("INVALID_RESPONSE", "VerifyAgent received an invalid server response.", response.status >= 500, response.status);
   }
-  if (!response.ok) {
+  if (!response.ok && !acceptedStatuses.includes(response.status)) {
     const error = (body as Partial<ApiErrorBody>)?.error;
     throw new ApiClientError(
       typeof error?.code === "string" ? error.code : "REQUEST_FAILED",
@@ -62,30 +70,46 @@ function parseTask(value: unknown): TaskSnapshot {
   return value as unknown as TaskSnapshot;
 }
 
+function parseReadiness(value: unknown): ReadinessSnapshot {
+  if (!isRecord(value) || !["ready", "degraded", "blocked"].includes(String(value.status)) ||
+      !["offline-success", "real-sandbox", "failure-demo", "incomplete"].includes(String(value.profile)) ||
+      !isRecord(value.checks)) {
+    throw new ApiClientError("INVALID_RESPONSE", "VerifyAgent received an invalid readiness snapshot.");
+  }
+  const checks = value.checks;
+  const allowed = ["ready", "missing", "invalid", "failed", "enabled", "disabled"];
+  if (!["database", "plannerConfiguration", "personaConfiguration", "webhookConfiguration", "demoMode"]
+    .every((key) => allowed.includes(String(checks[key])))) {
+    throw new ApiClientError("INVALID_RESPONSE", "VerifyAgent received an invalid readiness snapshot.");
+  }
+  return value as unknown as ReadinessSnapshot;
+}
+
 const json = (body: unknown): RequestInit => ({
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify(body),
 });
 
-export function createWorkspaceApi(fetcher: typeof fetch = fetch) {
+export function createWorkspaceApi(fetcher: typeof fetch = fetch, onRequestId?: (requestId: string) => void) {
   return {
-    health: () => requestJson<HealthSnapshot>(fetcher, "/api/health"),
-    demoContext: () => requestJson<DemoContext>(fetcher, "/api/demo/context"),
-    task: async (taskId: string) => parseTask(await requestJson<unknown>(fetcher, `/api/tasks/${encodeURIComponent(taskId)}`)),
+    health: () => requestJson<HealthSnapshot>(fetcher, "/api/health", undefined, onRequestId),
+    readiness: async () => parseReadiness(await requestJson<unknown>(fetcher, "/api/readiness", undefined, onRequestId, [503])),
+    demoContext: () => requestJson<DemoContext>(fetcher, "/api/demo/context", undefined, onRequestId),
+    task: async (taskId: string) => parseTask(await requestJson<unknown>(fetcher, `/api/tasks/${encodeURIComponent(taskId)}`, undefined, onRequestId)),
     createTask: async (requestText: string, idempotencyKey: string) => {
       const result = await requestJson<{ task: TaskSnapshot }>(fetcher, "/api/tasks", {
         ...json({ requestText }),
         headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
-      });
+      }, onRequestId);
       return parseTask(result.task);
     },
-    runTask: async (taskId: string) => parseTask(await requestJson<unknown>(fetcher, `/api/tasks/${encodeURIComponent(taskId)}/run`, json({}))),
+    runTask: async (taskId: string) => parseTask(await requestJson<unknown>(fetcher, `/api/tasks/${encodeURIComponent(taskId)}/run`, json({}), onRequestId)),
     confirm: async (actionId: string, decision: "APPROVE" | "REJECT", expectedPayloadHash: string) => {
-      const result = await requestJson<{ task: TaskSnapshot }>(fetcher, `/api/actions/${encodeURIComponent(actionId)}/confirm`, json({ decision, expectedPayloadHash }));
+      const result = await requestJson<{ task: TaskSnapshot }>(fetcher, `/api/actions/${encodeURIComponent(actionId)}/confirm`, json({ decision, expectedPayloadHash }), onRequestId);
       return parseTask(result.task);
     },
-    startVerification: (actionId: string) => requestJson<VerificationStart>(fetcher, `/api/actions/${encodeURIComponent(actionId)}/verification/start`, json({})),
-    resetDemo: () => requestJson<{ reset: true }>(fetcher, "/api/demo/reset", json({})),
+    startVerification: (actionId: string) => requestJson<VerificationStart>(fetcher, `/api/actions/${encodeURIComponent(actionId)}/verification/start`, json({}), onRequestId),
+    resetDemo: () => requestJson<{ reset: true }>(fetcher, "/api/demo/reset", json({}), onRequestId),
   };
 }

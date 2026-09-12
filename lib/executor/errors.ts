@@ -59,6 +59,9 @@ export const EXECUTION_ERROR_CODES = [
   "PLAN_RESOURCE_OWNERSHIP_MISMATCH",
   "PLAN_PRICE_MISMATCH",
   "PLANNING_IDEMPOTENCY_CONFLICT",
+  "REQUEST_ORIGIN_INVALID",
+  "REQUEST_TOO_LARGE",
+  "UNSUPPORTED_MEDIA_TYPE",
 ] as const;
 
 export type ExecutionErrorCode = (typeof EXECUTION_ERROR_CODES)[number];
@@ -124,6 +127,9 @@ const SAFE_MESSAGES: Record<ExecutionErrorCode, string> = {
   PLAN_RESOURCE_OWNERSHIP_MISMATCH: "The proposed plan references another user's resource.",
   PLAN_PRICE_MISMATCH: "The proposed price does not match the user's request.",
   PLANNING_IDEMPOTENCY_CONFLICT: "The idempotency key was already used for a different request.",
+  REQUEST_ORIGIN_INVALID: "The request origin is not allowed.",
+  REQUEST_TOO_LARGE: "The request body is too large.",
+  UNSUPPORTED_MEDIA_TYPE: "The request must use application/json.",
 };
 
 const RETRYABLE_CODES = new Set<ExecutionErrorCode>([
