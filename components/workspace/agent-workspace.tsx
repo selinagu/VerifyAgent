@@ -205,7 +205,13 @@ export function AgentWorkspace() {
                     </p>
                   )}
                 </section>
-                <AuthorizationCard task={task} busy={Boolean(busy)} onConfirm={confirm} onVerify={verify} />
+                <AuthorizationCard
+                  task={task}
+                  busy={Boolean(busy)}
+                  verificationError={error?.code.startsWith("PERSONA_") ? error : undefined}
+                  onConfirm={confirm}
+                  onVerify={verify}
+                />
                 <ActionTimeline actions={task.actions} />
               </>
             )}

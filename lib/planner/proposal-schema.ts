@@ -70,23 +70,21 @@ const resultRef = { type: "string", pattern: "^result:[a-z][a-z0-9_]{0,39}$" };
 
 export const PLANNER_PROPOSAL_JSON_SCHEMA = {
   type: "object",
-  oneOf: [
-    {
-      properties: {
-        kind: { const: "PLAN" },
-        summary: text(500),
-        actions: {
-          type: "array",
-          minItems: 1,
-          maxItems: 5,
-          items: {
-            oneOf: [
+  additionalProperties: false,
+  properties: {
+    kind: { type: "string", enum: ["PLAN", "UNSUPPORTED"] },
+    summary: text(500),
+    actions: {
+      type: "array",
+      maxItems: 5,
+      items: {
+        anyOf: [
               {
                 type: "object",
                 additionalProperties: false,
                 properties: {
                   ...commonProperties,
-                  type: { const: "CREATE_DRAFT_LISTING" },
+                  type: { type: "string", enum: ["CREATE_DRAFT_LISTING"] },
                   payload: {
                     type: "object",
                     additionalProperties: false,
@@ -105,14 +103,14 @@ export const PLANNER_PROPOSAL_JSON_SCHEMA = {
                 additionalProperties: false,
                 properties: {
                   ...commonProperties,
-                  type: { const: "SET_LISTING_PRICE" },
+                  type: { type: "string", enum: ["SET_LISTING_PRICE"] },
                   payload: {
                     type: "object",
                     additionalProperties: false,
                     properties: {
                       listingRef: resultRef,
                       priceCents: { type: "integer", minimum: 1, maximum: 100000000 },
-                      currency: { const: "USD" },
+                      currency: { type: "string", enum: ["USD"] },
                     },
                     required: ["listingRef", "priceCents", "currency"],
                   },
@@ -124,7 +122,7 @@ export const PLANNER_PROPOSAL_JSON_SCHEMA = {
                 additionalProperties: false,
                 properties: {
                   ...commonProperties,
-                  type: { const: "PUBLISH_LISTING" },
+                  type: { type: "string", enum: ["PUBLISH_LISTING"] },
                   payload: {
                     type: "object",
                     additionalProperties: false,
@@ -134,21 +132,9 @@ export const PLANNER_PROPOSAL_JSON_SCHEMA = {
                 },
                 required: ["key", "type", "payload", "rationale", "dependsOn"],
               },
-            ],
-          },
-        },
+        ],
       },
-      required: ["kind", "summary", "actions"],
-      additionalProperties: false,
     },
-    {
-      properties: {
-        kind: { const: "UNSUPPORTED" },
-        summary: text(500),
-        actions: { type: "array", maxItems: 0 },
-      },
-      required: ["kind", "summary", "actions"],
-      additionalProperties: false,
-    },
-  ],
+  },
+  required: ["kind", "summary", "actions"],
 } as const;

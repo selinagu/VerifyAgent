@@ -29,7 +29,7 @@ export class OpenAIPlannerGateway implements PlannerGateway {
     private readonly apiKey: string,
     readonly model: string,
     private readonly fetchImpl: Fetch = fetch,
-    private readonly timeoutMs = 10_000,
+    private readonly timeoutMs = 20_000,
   ) {}
 
   async createPlan(input: PlannerInput): Promise<unknown> {

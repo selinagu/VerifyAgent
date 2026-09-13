@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { compilePlan } from "@/lib/planner/plan-compiler";
 import { validatePlannerSemantics } from "@/lib/planner/plan-validator";
-import { plannerProposalSchema } from "@/lib/planner/proposal-schema";
+import { PLANNER_PROPOSAL_JSON_SCHEMA, plannerProposalSchema } from "@/lib/planner/proposal-schema";
 
 const proposal = {
   kind: "PLAN" as const,
@@ -22,7 +22,17 @@ describe("planner proposal boundary", () => {
     expect(plannerProposalSchema.safeParse({ ...proposal, authorized: true }).success).toBe(false);
     expect(plannerProposalSchema.safeParse({ ...proposal, actions: [{ type: "DELETE_USER" }] }).success).toBe(false);
     expect(plannerProposalSchema.safeParse({ kind: "UNSUPPORTED", summary: "No", actions: [] }).success).toBe(true);
+    expect(plannerProposalSchema.safeParse({ kind: "UNSUPPORTED", summary: "No", actions: proposal.actions }).success).toBe(false);
+    expect(plannerProposalSchema.safeParse({ kind: "PLAN", summary: "No", actions: [] }).success).toBe(false);
     expect(plannerProposalSchema.safeParse({ ...proposal, actions: proposal.actions.slice(0, 1) }).success).toBe(true);
+  });
+
+  it("uses the OpenAI Structured Outputs schema subset", () => {
+    const serialized = JSON.stringify(PLANNER_PROPOSAL_JSON_SCHEMA);
+    expect(PLANNER_PROPOSAL_JSON_SCHEMA.type).toBe("object");
+    expect(PLANNER_PROPOSAL_JSON_SCHEMA).not.toHaveProperty("anyOf");
+    expect(serialized).not.toContain('"oneOf"');
+    expect(serialized).toContain('"anyOf"');
   });
 
   it("rejects bad references, dependencies, ownership, and price drift", () => {

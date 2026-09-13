@@ -1,14 +1,20 @@
 import type { TaskActionSnapshot, TaskSnapshot } from "@/lib/client/contracts";
 import { actionPayloadSummary } from "@/lib/presentation/action-display";
 
+type VerificationError = {
+  code: string;
+  message: string;
+};
+
 type Props = {
   task: TaskSnapshot;
   busy: boolean;
+  verificationError?: VerificationError;
   onConfirm(action: TaskActionSnapshot, decision: "APPROVE" | "REJECT"): void;
   onVerify(action: TaskActionSnapshot): void;
 };
 
-export function AuthorizationCard({ task, busy, onConfirm, onVerify }: Props) {
+export function AuthorizationCard({ task, busy, verificationError, onConfirm, onVerify }: Props) {
   const waiting = task.actions.find((action) => action.status === task.status);
   const verificationFailure = [...task.audit].reverse().find((event) =>
     ["IDENTITY_VERIFICATION_DECLINED", "IDENTITY_VERIFICATION_FAILED", "IDENTITY_VERIFICATION_EXPIRED"].includes(event.eventType),
@@ -37,7 +43,14 @@ export function AuthorizationCard({ task, busy, onConfirm, onVerify }: Props) {
             Previous verification did not approve. No grant was issued; the listing remains private. You may start a new Sandbox attempt.
           </p>
         )}
-        <button type="button" className="primary-button mt-5 bg-violet-300 hover:bg-violet-200" disabled={busy} onClick={() => onVerify(waiting)}>Verify identity with Persona</button>
+        {verificationError && (
+          <p role="alert" className="mt-4 rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
+            <strong>Persona could not start.</strong> {verificationError.message} The listing remains private.
+          </p>
+        )}
+        <button type="button" className="primary-button mt-5 bg-violet-300 hover:bg-violet-200" disabled={busy} onClick={() => onVerify(waiting)}>
+          {busy ? "Starting Persona…" : "Verify identity with Persona"}
+        </button>
       </section>
     );
   }

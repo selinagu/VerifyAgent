@@ -25,8 +25,8 @@ PERSONA_API_VERSION="2025-10-27"
 
 ## Verification sequence
 
-1. Run `pnpm doctor`. Resolve every `BLOCKED` result before continuing.
-2. Run `pnpm doctor -- --live` to make one bounded planner validation. This command does not create a Persona inquiry.
+1. Run `pnpm run doctor`. Resolve every `BLOCKED` result before continuing.
+2. Run `pnpm run doctor -- --live` to make one bounded planner validation. This command does not create a Persona inquiry.
 3. Apply migrations, seed the demo namespace, and start the production build.
 4. Confirm `GET /api/readiness` reports `ready` and profile `real-sandbox` without exposing any configured value.
 5. In the Workspace, submit `Sell my concert ticket for $80.` and advance through draft creation and exact-price confirmation.

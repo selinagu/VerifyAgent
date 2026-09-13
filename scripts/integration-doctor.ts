@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 
 import { parseEnv, configurationFlags } from "../lib/config/env";
 import { db } from "../lib/db";
+import { ExecutionError } from "../lib/executor/errors";
 import { OpenAIPlannerGateway } from "../lib/planner/providers/openai-planner";
 import { PLANNER_PROMPT_VERSION } from "../lib/planner/prompt-builder";
 
@@ -50,15 +51,16 @@ async function main() {
 
   if (live && env.LLM_PROVIDER === "openai" && env.LLM_API_KEY && env.LLM_MODEL) {
     try {
-      await new OpenAIPlannerGateway(env.LLM_API_KEY, env.LLM_MODEL, fetch, 8_000).createPlan({
+      await new OpenAIPlannerGateway(env.LLM_API_KEY, env.LLM_MODEL, fetch, 20_000).createPlan({
         requestText: "Sell my doctor-test ticket for $1.",
         availableInventory: [{ id: "doctor_test_item", type: "TICKET", title: "Doctor test ticket", description: "Synthetic integration-check inventory." }],
         supportedActions: ["CREATE_DRAFT_LISTING", "SET_LISTING_PRICE", "PUBLISH_LISTING"],
         promptVersion: PLANNER_PROMPT_VERSION,
       });
       add("OpenAI live check", "PASS", "Strict structured plan returned");
-    } catch {
-      add("OpenAI live check", "FAIL", "Provider call failed with a safe diagnostic");
+    } catch (error) {
+      const code = error instanceof ExecutionError ? error.code : "UNKNOWN_ERROR";
+      add("OpenAI live check", "FAIL", `Provider validation failed (${code})`);
     }
   } else {
     add("OpenAI live check", "SKIP", live ? "OpenAI credentials not configured" : "Run with --live to enable");

@@ -2,7 +2,7 @@
 
 ## Primary path
 
-1. Run `pnpm doctor`, `pnpm db:migrate`, and `pnpm db:seed` before the session.
+1. Run `pnpm run doctor`, `pnpm db:migrate`, and `pnpm db:seed` before the session.
 2. Open the Workspace and point out the readiness/profile badge.
 3. Submit `Sell my concert ticket for $80.`.
 4. Explain that the model proposes three typed actions but has no execution authority.

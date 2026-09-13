@@ -32,6 +32,86 @@ describe("Persona HTTP client", () => {
     });
   });
 
+  it("accepts a created inquiry with a null session token", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          data: {
+            id: "inq_demo_null_token",
+            attributes: { status: "created", "reference-id": "vref_null_token" },
+          },
+          meta: { "session-token": null },
+        },
+        { status: 201 },
+      ),
+    );
+    const client = new PersonaHttpClient({ ...config, fetchImpl });
+
+    await expect(
+      client.createInquiry({
+        templateId: "itmpl_demo",
+        referenceId: "vref_null_token",
+        idempotencyKey: "verification-null-token",
+      }),
+    ).resolves.toEqual({
+      inquiryId: "inq_demo_null_token",
+      referenceId: "vref_null_token",
+      status: "created",
+      sessionToken: undefined,
+    });
+  });
+
+  it("accepts a created inquiry when response metadata is absent", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          data: {
+            id: "inq_demo_without_meta",
+            attributes: { status: "created", "reference-id": "vref_without_meta" },
+          },
+        },
+        { status: 201 },
+      ),
+    );
+    const client = new PersonaHttpClient({ ...config, fetchImpl });
+
+    await expect(
+      client.createInquiry({
+        templateId: "itmpl_demo",
+        referenceId: "vref_without_meta",
+        idempotencyKey: "verification-without-meta",
+      }),
+    ).resolves.toMatchObject({
+      inquiryId: "inq_demo_without_meta",
+      referenceId: "vref_without_meta",
+      sessionToken: undefined,
+    });
+  });
+
+  it("rejects a created inquiry bound to a different reference ID", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          data: {
+            id: "inq_demo_mismatch",
+            attributes: { status: "created", "reference-id": "vref_someone_else" },
+          },
+          meta: { "session-token": null },
+        },
+        { status: 201 },
+      ),
+    );
+    const client = new PersonaHttpClient({ ...config, fetchImpl });
+
+    await expect(
+      client.createInquiry({
+        templateId: "itmpl_demo",
+        referenceId: "vref_expected",
+        idempotencyKey: "verification-mismatch",
+      }),
+    ).rejects.toMatchObject({ code: "PERSONA_RESPONSE_INVALID" });
+  });
+
   it("maps network, non-2xx, and malformed responses to safe errors without secret leakage", async () => {
     const failures: Array<typeof fetch> = [
       vi.fn<typeof fetch>().mockRejectedValue(new Error(`network ${config.apiKey}`)),

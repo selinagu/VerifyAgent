@@ -2,7 +2,7 @@
 
 ## Configuration and safety
 
-- [ ] `pnpm doctor` has no `BLOCKED` result.
+- [ ] `pnpm run doctor` has no `BLOCKED` result.
 - [ ] `GET /api/readiness` contains categories only—no URLs with credentials, keys, request text, payloads, inquiry IDs, hashes, or cookies.
 - [ ] Fake planner is used only with `DEMO_MODE=true` or tests.
 - [ ] Production `APP_BASE_URL` is HTTPS and matches the visible application origin.

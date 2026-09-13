@@ -101,8 +101,8 @@ pnpm demo:phase4      # Plan from natural language, authorize, verify, and publi
 pnpm demo:phase5      # Run the full Phase 4 flow plus Workspace contract smoke tests
 pnpm demo:success     # Run the deterministic happy-path release demo
 pnpm demo:failure     # Prove decline, duplicate delivery, and fail-closed behavior
-pnpm doctor           # Check local integration readiness without network calls
-pnpm doctor -- --live # Validate configured OpenAI access; skips missing integrations
+pnpm run doctor           # Check local integration readiness without network calls
+pnpm run doctor -- --live # Validate configured OpenAI access; skips missing integrations
 ```
 
 ## Environment
@@ -356,7 +356,7 @@ This runs the signed fake-Persona end-to-end flow and the Workspace API, state-m
 
 ## Phase 6 release readiness
 
-Phase 6 keeps the product boundary unchanged and makes it safe and repeatable to demonstrate. `GET /api/readiness` reports only categorical checks and returns `503` when a database or planner requirement blocks operation. `pnpm doctor` checks Node, environment parsing, migrations, database access, profile selection, and integration flags without printing credentials or making network requests. Add `--live` only when intentionally validating configured OpenAI access; Persona is reported as `SKIPPED` because inquiry creation is side-effecting.
+Phase 6 keeps the product boundary unchanged and makes it safe and repeatable to demonstrate. `GET /api/readiness` reports only categorical checks and returns `503` when a database or planner requirement blocks operation. `pnpm run doctor` checks Node, environment parsing, migrations, database access, profile selection, and integration flags without printing credentials or making network requests. Add `--live` only when intentionally validating configured OpenAI access; Persona is reported as `SKIPPED` because inquiry creation is side-effecting. The explicit `run` is required because current pnpm releases also provide a built-in command named `doctor`.
 
 All JSON mutations require `application/json`, strict schemas, and a 16 KiB body limit. Production browser mutations also require an exact same-origin `Origin` header. The Persona webhook retains its separate raw-body signature boundary and uses a 256 KiB limit. Every API response carries `X-Request-ID`; logs contain route, method, status, duration, and outcome after recursive secret redaction.
 

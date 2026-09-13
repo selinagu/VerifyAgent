@@ -19,7 +19,7 @@ const statusSchema = z
       : "unknown";
   });
 
-const inquiryResponseSchema = z.object({
+const inquiryResourceSchema = z.object({
   data: z.object({
     id: z.string().min(1),
     attributes: z.object({
@@ -27,7 +27,10 @@ const inquiryResponseSchema = z.object({
       "reference-id": z.string().nullish(),
     }).passthrough(),
   }),
-  meta: z.object({ "session-token": z.string().min(1).optional() }).passthrough().optional(),
+});
+
+const createInquiryResponseSchema = inquiryResourceSchema.extend({
+  meta: z.object({ "session-token": z.string().min(1).nullish() }).passthrough().optional(),
 });
 
 const resumeResponseSchema = z.object({
@@ -70,20 +73,20 @@ export class PersonaHttpClient implements PersonaGateway {
         },
       }),
     });
-    const parsed = inquiryResponseSchema.safeParse(response);
-    if (!parsed.success || !parsed.data.data.attributes["reference-id"]) {
+    const parsed = createInquiryResponseSchema.safeParse(response);
+    if (!parsed.success || parsed.data.data.attributes["reference-id"] !== input.referenceId) {
       throw new ExecutionError("PERSONA_RESPONSE_INVALID");
     }
     return {
       inquiryId: parsed.data.data.id,
       status: parsed.data.data.attributes.status,
       referenceId: parsed.data.data.attributes["reference-id"],
-      sessionToken: parsed.data.meta?.["session-token"],
+      sessionToken: parsed.data.meta?.["session-token"] ?? undefined,
     };
   }
 
   async retrieveInquiry(inquiryId: string) {
-    const parsed = inquiryResponseSchema.safeParse(
+    const parsed = inquiryResourceSchema.safeParse(
       await this.request(`/inquiries/${encodeURIComponent(inquiryId)}`, { method: "GET" }),
     );
     if (!parsed.success) throw new ExecutionError("PERSONA_RESPONSE_INVALID");
