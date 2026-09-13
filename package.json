@@ -26,6 +26,7 @@
     "demo:success": "tsx scripts/demo-phase4.ts",
     "demo:failure": "tsx scripts/demo-failure.ts",
     "doctor": "tsx scripts/integration-doctor.ts",
+    "release:verify": "tsx scripts/release-verify.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

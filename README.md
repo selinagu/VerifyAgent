@@ -1,248 +1,145 @@
 # VerifyAgent
 
-VerifyAgent is an identity-gated authorization layer for AI agents. The core pipeline is:
+VerifyAgent is a trust-aware authorization layer for AI agents. It lets an LLM propose useful work while keeping permission, identity verification, and state changes under deterministic application control.
+
+The included demo turns a natural-language request—`Sell my concert ticket for $80.`—into typed marketplace actions. Drafting is allowed automatically, setting the price requires explicit confirmation, and publishing requires a Persona-verified human.
 
 ```text
 user request
-  -> LLM proposes typed actions
+  -> LLM proposes structured actions
+  -> strict validation
   -> deterministic policy engine
   -> NONE | CONFIRM | VERIFIED_IDENTITY
-  -> Persona verification when required
-  -> executor mutates marketplace state
+  -> exact-action authorization
+  -> executor mutates the mock marketplace
   -> append-only audit trail
 ```
 
-This repository contains **Phase 0 through Phase 6**: the complete hackathon MVP plus readiness diagnostics, hardened mutation boundaries, correlation-safe logging, security headers, explicit success/failure demos, and release runbooks.
+## What it demonstrates
 
-## Security invariants
+- An LLM can propose actions but cannot authorize or execute them.
+- A deterministic policy table decides the requirement for every action.
+- Human confirmation is bound to the exact action payload that was reviewed.
+- Persona verification authorizes only one user, session, action, and payload.
+- Browser completion is not trusted; approval requires a signed webhook and an authoritative server-side inquiry lookup.
+- Authorization grants are short-lived, one-time-use, and consumed transactionally with execution.
+- Every important decision and mutation is recorded in an append-only audit trail.
+- Offline success and failure demos exercise the same boundaries without external services.
 
-1. The LLM may propose typed actions; it cannot authorize or execute them.
-2. The deterministic policy engine is the only source of authorization requirements.
-3. Business mutations may only pass through the executor boundary.
-4. A Persona browser callback is never authoritative proof of verification.
-5. Identity grants bind to one user/session, exact action payload, resource, and expiry.
-6. Business mutations and audit writes execute in one database transaction.
+## Demo workflow
 
-The UI, LLM output, and Persona client callbacks are all untrusted inputs. None can write marketplace state directly.
+The marketplace demo supports three actions:
 
-## Stack
+| Action | Policy requirement | Result |
+| --- | --- | --- |
+| `CREATE_DRAFT_LISTING` | `NONE` | Creates a private listing draft |
+| `SET_LISTING_PRICE` | `CONFIRM` | Sets the reviewed price to $80 |
+| `PUBLISH_LISTING` | `VERIFIED_IDENTITY` | Publishes only after Persona approval |
 
-- Next.js App Router and strict TypeScript
+The expected successful result is a `$80 USD` listing in `PUBLISHED` state at version `3`, with the identity grant consumed exactly once.
+
+## Tech stack
+
+- Next.js App Router and React
+- TypeScript in strict mode
 - Tailwind CSS
-- Zod contracts and environment validation
 - Prisma with SQLite
-- Vitest
-- ESLint
+- Zod request, response, and environment validation
+- OpenAI Responses API with Structured Outputs
+- Persona Embedded Flow and signed webhooks
+- Vitest and ESLint
 
-Node.js 22.5 or newer is required. The migration smoke test uses Node's built-in SQLite driver to create a valid, empty database before applying migrations.
+## Requirements
 
-## Project structure
+- Node.js 22.5 or newer
+- pnpm
+- OpenAI API access for the real planner flow
+- A Persona Sandbox environment for real identity verification
+- An HTTPS tunnel such as ngrok for local Persona webhook delivery
 
-```text
-app/                    Minimal application and health endpoint
-components/workspace/   Responsive Agent Workspace and trust-state components
-lib/actions/            Canonical action schemas and display catalog
-lib/audit/              Append-only audit writer
-lib/config/             Environment validation
-lib/domain/             Shared status schemas and inferred types
-lib/authorization/      Confirmation evidence and identity-grant validation
-lib/executor/           Execution boundary, dispatcher, handlers, and safe errors
-lib/http/               Strict API request and safe error contracts
-lib/health/             Non-sensitive health reporting
-lib/readiness/          Release and integration readiness reporting
-lib/observability/      Correlation IDs, structured logging, and redaction
-lib/security/           CSP and browser security headers
-lib/demo/               Stable demo fixture identifiers
-lib/marketplace/        Listing invariants and transactional mutations
-lib/orchestrator/       Restart-safe task runner
-lib/policy/             Pure deterministic policy engine and DB context builder
-lib/persona/            Persona API adapter, event parser, and webhook signature verification
-lib/planner/            LLM gateway, strict proposal schema, semantic validator, and compiler
-lib/client/             Browser API boundary, response validation, and UI state mapping
-lib/presentation/       Pure action and marketplace display formatters
-lib/state-machine/      Explicit action/task transition graphs and CAS updates
-lib/tasks/              Safe task snapshots
-lib/verification/       Verification lifecycle, webhook processing, and grant issuance
-prisma/                 Database schema, migration, and seed
-scripts/                Repeatable Phase 1 executor demo
-tests/                  Contract, configuration, migration, and seed tests
-```
+OpenAI and Persona are optional for the deterministic offline demo.
 
-## Setup
+## Quick start: offline demo
+
+Install dependencies and create the local environment file:
 
 ```bash
 pnpm install
-copy .env.example .env
+```
+
+Windows:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+macOS/Linux:
+
+```bash
+cp .env.example .env
+```
+
+Use the offline profile in `.env`:
+
+```dotenv
+DATABASE_URL="file:./dev.db"
+DEMO_MODE="true"
+DEMO_PROFILE="offline-success"
+APP_BASE_URL="http://localhost:3000"
+LLM_PROVIDER="fake"
+```
+
+Initialize and start the application:
+
+```bash
 pnpm db:migrate
 pnpm db:seed
 pnpm dev
 ```
 
-On macOS/Linux, use `cp .env.example .env` instead of `copy`.
-
-The local application is available at `http://localhost:3000`. The health endpoint is `GET /api/health`.
-
-## Commands
-
-```bash
-pnpm dev             # Start the development server
-pnpm build           # Create a production build
-pnpm lint            # Run ESLint
-pnpm typecheck       # Run strict TypeScript checks
-pnpm test            # Run all tests
-pnpm db:generate     # Generate the Prisma client
-pnpm db:migrate      # Apply committed migrations
-pnpm db:migrate:dev  # Create a development migration after schema changes
-pnpm db:seed          # Reset and seed the demo namespace
-pnpm demo:phase1      # Run draft -> set $80 -> publish through the executor
-pnpm demo:phase2      # Run policy -> confirmation -> test grant -> publish
-pnpm demo:phase3      # Run a signed fake-Persona end-to-end flow without network
-pnpm demo:phase4      # Plan from natural language, authorize, verify, and publish without network
-pnpm demo:phase5      # Run the full Phase 4 flow plus Workspace contract smoke tests
-pnpm demo:success     # Run the deterministic happy-path release demo
-pnpm demo:failure     # Prove decline, duplicate delivery, and fail-closed behavior
-pnpm run doctor           # Check local integration readiness without network calls
-pnpm run doctor -- --live # Validate configured OpenAI access; skips missing integrations
-```
-
-## Environment
-
-Copy `.env.example` to `.env`. All phases require `DATABASE_URL`; set `DEMO_MODE=true` only for local demo APIs. Persona variables are optional until the real sandbox flow is used and must remain server-side secrets. Do not prefix API keys or webhook secrets with `NEXT_PUBLIC_`.
-
-## Demo seed
-
-The repeatable seed creates:
-
-- demo user `Alex`;
-- a long-lived local demo session;
-- one Rice Stadium concert ticket inventory item;
-- no task runs and no published listings.
-
-It is designed for the future prompt: `Sell my concert ticket for $80.`
-
-## Phase 1 executor
-
-Phase 1 implements a single capability boundary:
+Open [http://localhost:3000](http://localhost:3000) and submit:
 
 ```text
-persisted AUTHORIZED ActionRun
-  -> ownership and session checks
-  -> strict Zod re-validation
-  -> atomic execution claim
-  -> dependency/reference resolution
-  -> action-specific handler
-  -> transactional mutation + result + success audit
+Sell my concert ticket for $80.
 ```
 
-The supported handlers are:
+The fake planner is deterministic and is available only in demo mode or tests.
 
-- `CREATE_DRAFT_LISTING`: validates inventory ownership and creates a private draft.
-- `SET_LISTING_PRICE`: resolves a same-task draft result, sets USD cents, and increments the listing version.
-- `PUBLISH_LISTING`: requires a complete, priced draft and performs `DRAFT -> PUBLISHED`.
+## Configuration
 
-The executor receives an `ActionRun` ID, reloads all authoritative data from the database, and never trusts caller-supplied ownership, status, result, or idempotency values. Logical listing references may only resolve successful `CREATE_DRAFT_LISTING` actions in the same task.
+All secrets are server-side only. Never prefix API keys or webhook secrets with `NEXT_PUBLIC_`, and never commit `.env`.
 
-### Idempotency, concurrency, and audit
+| Variable | Purpose | Typical local value |
+| --- | --- | --- |
+| `DATABASE_URL` | Prisma database connection | `file:./dev.db` |
+| `DEMO_MODE` | Enables the fixed demo identity and reset APIs | `true` |
+| `DEMO_PROFILE` | Readiness profile | `offline-success`, `real-sandbox`, or `failure-demo` |
+| `APP_BASE_URL` | Trusted application origin; for local Persona testing, use the current HTTPS tunnel origin | `http://localhost:3000` |
+| `LLM_PROVIDER` | Planner implementation | `fake` or `openai` |
+| `LLM_API_KEY` | OpenAI API key | Required for `openai` |
+| `LLM_MODEL` | OpenAI planner model | `gpt-5-mini` |
+| `PERSONA_API_KEY` | Persona Sandbox server API key | Required for real Sandbox verification |
+| `PERSONA_WEBHOOK_SECRET` | Signing secret for the specific Persona webhook | Required for signed webhook validation |
+| `PERSONA_ENVIRONMENT_ID` | Persona Sandbox environment ID | `env_...` |
+| `PERSONA_TEMPLATE_ID` | Active Persona Inquiry Template ID | `itmpl_...` |
+| `PERSONA_API_VERSION` | Persona Server API version | `2025-10-27` |
 
-- A conditional `AUTHORIZED -> EXECUTING` update atomically claims execution.
-- A successful retry replays the persisted result without repeating the mutation.
-- Listing mutations use version-based compare-and-swap updates.
-- The business mutation, persisted action result, domain audit event, and success audit event commit in one Prisma transaction.
-- A failed transaction rolls back the marketplace mutation; a separate failure transaction records a safe error code without a false success event.
-- Audit metadata excludes secrets and sensitive identity data.
+`PERSONA_API_VERSION` controls VerifyAgent's Server API requests. Persona Dashboard controls the webhook payload version independently; the current Sandbox webhook contract used by this project is `2025-12-08`.
 
-SQLite serializes writes, but the explicit action claim and listing version checks preserve the intended boundary when the project later moves to a multi-writer database.
+## Real OpenAI and Persona Sandbox setup
 
-### Phase 1 demo
-
-```bash
-pnpm db:migrate
-pnpm demo:phase1
-```
-
-The command resets only the demo namespace, creates a task with three validated fixture actions, and sends all three through `ActionExecutor`. The expected final listing is `$80 USD`, `PUBLISHED`, version `3`, with all actions `SUCCEEDED` and nine audit events.
-
-The Phase 1 demo creates already-authorized fixtures only to exercise the executor in isolation. Production task flow reaches `AUTHORIZED` only through the Phase 2 orchestrator.
-
-## Phase 2 policy and orchestrator
-
-Phase 2 enforces the full authorization path before execution:
-
-```text
-VALIDATED
-  -> deterministic policy evaluation
-  -> NONE | CONFIRM | VERIFIED_IDENTITY
-  -> durable wait when evidence is missing
-  -> AUTHORIZED
-  -> executor
-```
-
-The versioned policy table currently maps:
-
-- `CREATE_DRAFT_LISTING` to `NONE` because it remains private;
-- `SET_LISTING_PRICE` to `CONFIRM` because the user must approve the exact price payload;
-- `PUBLISH_LISTING` to `VERIFIED_IDENTITY` because it publicly represents the user.
-
-Policy evaluation is a pure function. Database access is isolated in the policy-context builder, which validates dependencies, resource existence, ownership, and listing state. Every policy outcome persists its policy ID, version, reason code, and audit event.
-
-Confirmation approval binds the server-loaded action, user, session, and canonical payload to a SHA-256 hash. A changed payload invalidates previously displayed confirmation data. Rejection cancels the task and all unexecuted downstream actions.
-
-Identity grants use the same exact-action scope, require an approved and unexpired verification session, and are consumed transactionally by the executor. Phase 2 includes a demo/test-only grant issuer; it is unavailable when `DEMO_MODE=false` outside tests and is not a substitute for Persona.
-
-The task runner can be called repeatedly. It progresses until completion or a durable `WAITING_CONFIRMATION` / `WAITING_IDENTITY` boundary, then returns a safe task snapshot. Completed tasks and actions replay without duplicate marketplace mutations.
-
-### Phase 2 API
-
-These endpoints are available only in demo mode and obtain user/session identity from server-owned demo context. Request bodies cannot inject authorization identity.
-
-```text
-GET  /api/tasks/:taskId
-POST /api/tasks/:taskId/run                  body: {}
-POST /api/actions/:actionId/confirm          body: { decision, expectedPayloadHash }
-POST /api/actions/:actionId/resume           body: {}
-```
-
-Task snapshots expose the confirmation hash only while it is needed. They never expose authorization grants, scope hashes, Persona references, or secrets.
-
-### Phase 2 demo
-
-```bash
-pnpm db:migrate
-pnpm demo:phase2
-```
-
-The demo resets only the stable demo namespace, creates three validated actions, runs through the `NONE` action, approves the price confirmation, issues a clearly marked demo-only identity grant, resumes publishing, and prints the completed listing and audit summary.
-
-## Phase 3 Persona integration
-
-Phase 3 replaces simulated identity evidence with a server-created Persona inquiry and an authoritative approval path:
-
-```text
-WAITING_IDENTITY
-  -> server pre-creates Persona inquiry
-  -> Embedded Flow collects identity evidence
-  -> raw-body webhook signature verification
-  -> server retrieves current inquiry state
-  -> exact action scope revalidated
-  -> short-lived one-time grant issued
-  -> existing runner resumes and executor consumes grant
-```
-
-The browser callback is deliberately non-authoritative. It only changes UI copy while the page polls VerifyAgent's safe verification endpoint. Publishing remains blocked until a signed `inquiry.approved` event is received, the inquiry is retrieved through Persona's server API, and its opaque reference ID matches the stored verification.
-
-Persona recommends pre-creating inquiries on the server for production integrations and using webhooks rather than client callbacks for current state. This implementation pins server API version `2025-10-27` and Embedded SDK `5.8.0`; review Persona's official [pre-created Embedded Flow guide](https://docs.withpersona.com/tutorial-embedded-flow-precreate), [client callback warning](https://docs.withpersona.com/embedded-flow-client-callbacks), and [webhook practices](https://docs.withpersona.com/webhooks-best-practices) before upgrading either contract.
-
-### Persona sandbox setup
-
-1. In the Persona Dashboard, switch to Sandbox and create or select an active Inquiry Template.
-2. Create a Sandbox API key with inquiry create/read/resume access.
-3. Create a webhook for inquiry lifecycle events and point it to `https://<public-host>/api/webhooks/persona`.
-4. Configure at least `inquiry.approved`, `inquiry.declined`, `inquiry.failed`, and `inquiry.expired`; `created`, `started`, and `completed` are also supported.
-5. Copy the webhook-specific signing secret, environment ID, and template ID into the server-side environment variables below.
-6. In template security settings, block client-side inquiry creation because VerifyAgent pre-creates every inquiry.
-7. For local development, expose the Next.js server through an HTTPS tunnel and use its stable HTTPS webhook URL. No particular tunnel provider is required.
+Configure `.env` without exposing any value to the browser:
 
 ```dotenv
+DATABASE_URL="file:./dev.db"
+DEMO_MODE="true"
+DEMO_PROFILE="real-sandbox"
+APP_BASE_URL="https://your-current-tunnel.example"
+
+LLM_PROVIDER="openai"
+LLM_API_KEY="..."
+LLM_MODEL="gpt-5-mini"
+
 PERSONA_API_KEY="..."
 PERSONA_WEBHOOK_SECRET="..."
 PERSONA_ENVIRONMENT_ID="env_..."
@@ -250,129 +147,154 @@ PERSONA_TEMPLATE_ID="itmpl_..."
 PERSONA_API_VERSION="2025-10-27"
 ```
 
-Never commit these values. The health endpoint reports only whether the complete Persona configuration is present.
-
-### Real sandbox flow
-
-First drive a task to `WAITING_IDENTITY`, then start verification:
-
-```text
-POST /api/actions/:actionId/verification/start   body: {}
-```
-
-The response includes a local `verificationUrl` and only the short-lived flow data required by the Persona client. Open `/verify/:verificationId` to complete the Embedded Flow. The page waits for the signed webhook, then calls the existing resume endpoint only after the safe verification snapshot reports an active grant.
-
-Additional Phase 3 endpoints:
-
-```text
-GET  /api/verifications/:verificationId
-POST /api/webhooks/persona
-```
-
-The verification query never returns Persona attributes, identity documents, reference IDs, scope hashes, webhook payloads, grants, or secrets. Webhook storage contains only event identifiers, type, inquiry ID, timestamps, processing status, and a hash of the raw payload. Duplicate delivery is idempotent and older out-of-order events cannot overwrite newer state.
-
-### Fake integration flow
-
-The complete Persona boundary can be exercised without credentials or network access:
+Validate local configuration:
 
 ```bash
-pnpm demo:phase3
-pnpm test -- tests/verification/phase3.integration.test.ts
+pnpm run doctor
+pnpm run doctor -- --live
 ```
 
-The fake demo still signs and verifies a Persona-shaped raw webhook, performs authoritative retrieval through an injected fake gateway, issues and consumes the grant, and publishes the listing. It is clearly separate from the real Sandbox integration and is never used by production Persona routes.
+The second command makes one bounded OpenAI request. Persona remains skipped because creating an inquiry has side effects.
 
-### Failure and recovery
+### Persona webhook
 
-- Missing Persona configuration or upstream timeouts leave the action in `WAITING_IDENTITY`.
-- Declined, failed, expired, or cancelled verification never creates a grant; the user may start a new verification attempt while the task remains safely paused.
-- If the action changes after verification starts, the verification becomes `FAILED` with `VERIFICATION_ACTION_CHANGED` and cannot authorize the new payload.
-- Duplicate webhooks return success without duplicate grants or audit effects.
-- Failed webhook processing remains retryable; the same event can be processed again after an upstream recovery.
-- If publish execution fails after authorization, the one-time grant is revoked by the executor.
-
-## Phase 4 LLM planning
-
-Phase 4 accepts `POST /api/tasks` with `{ "requestText": "..." }` and a required `Idempotency-Key` header. In demo mode, server-owned demo identity is used; callers cannot inject a user, session, authorization requirement, action status, or execution result. A successful request returns a `READY` task and does not execute it automatically.
-
-```text
-untrusted natural-language request
-  -> OpenAI Responses API Structured Output
-  -> strict Zod allowlist
-  -> deterministic reference, dependency, ownership, and price validation
-  -> server-generated action IDs and symbolic-reference compilation
-  -> PROPOSED -> VALIDATED actions
-  -> existing task runner and authorization pipeline
-```
-
-Configure the real planner with `LLM_PROVIDER=openai`, `LLM_API_KEY`, and `LLM_MODEL`. The adapter calls the server-side Responses API with a strict JSON Schema, disables tools, sets a bounded output budget and timeout, rejects refusals/incomplete/malformed output, and never repairs model text. See the official [Responses API create reference](https://developers.openai.com/api/reference/cli/resources/responses/methods/create).
-
-`LLM_PROVIDER=fake` is permitted only in tests or when `DEMO_MODE=true`. It supports the fixed demo prompt `Sell my concert ticket for $80.` without network access. Planning failures persist a safe error code and audit event, create no actions unless the entire validated plan commits, and never mutate listings. Request idempotency is scoped to the trusted user and session; reusing a key with a different body returns a conflict.
-
-### Phase 4 demo
+For local development, run the application and tunnel in separate terminals:
 
 ```bash
-pnpm db:migrate
-pnpm demo:phase4
-```
-
-The demo resets only the demo namespace and exercises fake planning, confirmation, a signed fake-Persona webhook, one-time grant consumption, and final publication.
-
-## Phase 5 Agent Workspace
-
-The `/` route is now a responsive trust workspace rather than a status placeholder. It exposes the entire server-owned lifecycle in one presentation:
-
-```text
-request composer
-  -> structured action timeline
-  -> run to a durable authorization boundary
-  -> exact-price confirmation
-  -> Persona identity verification
-  -> marketplace result
-  -> append-only audit trail
-```
-
-The browser never infers policy or authorization from action types. It renders `status`, `requirement`, confirmation hashes, verification state, marketplace results, and audit events from allowlisted server snapshots. Malformed API responses fail closed. A browser Persona callback only updates explanatory copy; only the signed webhook plus authoritative server retrieval can activate a grant and resume publishing.
-
-For the offline Workspace, configure `DEMO_MODE=true` and `LLM_PROVIDER=fake`, run migrations and seed, then start the app. The fake planner supports the stable prompt `Sell my concert ticket for $80.`. The real sandbox experience uses `LLM_PROVIDER=openai` with the server-side OpenAI variables and the Phase 3 Persona sandbox variables.
-
-```bash
-pnpm db:migrate
-pnpm db:seed
 pnpm dev
 ```
 
-The Workspace includes a demo-only reset control backed by `POST /api/demo/reset`. That endpoint accepts only `{}`, rejects non-demo environments, and always resets the fixed demo namespace—callers cannot select a user or database scope. `GET /api/demo/context` returns only the safe fixed prompt and inventory preview needed by the demo.
-
-Recovery behavior is explicit: safe upstream/network failures can be refreshed; changed confirmation payloads require a new review; rejected confirmations cancel the task; declined, failed, or expired Persona attempts leave publishing blocked. The latest task ID is stored only as navigation state and is revalidated against server ownership when the page reloads.
-
-### Phase 5 demo
-
 ```bash
-pnpm demo:phase5
+ngrok http 3000
 ```
 
-This runs the signed fake-Persona end-to-end flow and the Workspace API, state-mapping, formatting, reset-boundary, and malformed-response smoke tests.
+In the Persona Dashboard Sandbox environment:
 
-## Phase 6 release readiness
+1. Create or select an active Inquiry Template.
+2. Allow `http://localhost:3000` for the Embedded Flow.
+3. Create a webhook with this exact shape:
 
-Phase 6 keeps the product boundary unchanged and makes it safe and repeatable to demonstrate. `GET /api/readiness` reports only categorical checks and returns `503` when a database or planner requirement blocks operation. `pnpm run doctor` checks Node, environment parsing, migrations, database access, profile selection, and integration flags without printing credentials or making network requests. Add `--live` only when intentionally validating configured OpenAI access; Persona is reported as `SKIPPED` because inquiry creation is side-effecting. The explicit `run` is required because current pnpm releases also provide a built-in command named `doctor`.
+   ```text
+   https://<current-ngrok-domain>/api/webhooks/persona
+   ```
 
-All JSON mutations require `application/json`, strict schemas, and a 16 KiB body limit. Production browser mutations also require an exact same-origin `Origin` header. The Persona webhook retains its separate raw-body signature boundary and uses a 256 KiB limit. Every API response carries `X-Request-ID`; logs contain route, method, status, duration, and outcome after recursive secret redaction.
+4. Enable at least `inquiry.approved`, `inquiry.completed`, `inquiry.declined`, and `inquiry.failed`. Lifecycle events may also be enabled.
+5. Enable the webhook before creating the test inquiry.
+6. Copy that webhook's signing secret to `PERSONA_WEBHOOK_SECRET` and restart the application.
 
-The production CSP allowlists the pinned Persona SDK and inquiry surfaces, disables objects and external framing, and excludes `unsafe-eval`. Review [Persona embedded-flow security](https://docs.withpersona.com/2023-01-05/embedded-flow-security), [CSP troubleshooting](https://docs.withpersona.com/embedded-flow-troubleshooting-common-issues), and [webhook best practices](https://docs.withpersona.com/webhooks-best-practices) before changing these boundaries.
+Open VerifyAgent at [http://localhost:3000](http://localhost:3000). Use ngrok only for Persona's server-to-server webhook; opening the application through a free ngrok URL may trigger its browser warning page.
 
-Use the operational documents in `docs/`:
+After completing Persona, return to the VerifyAgent tab. Polling pauses while the document is hidden and resumes when the tab becomes visible.
 
-- `real-sandbox-runbook.md` for a controlled OpenAI + Persona Sandbox verification;
-- `demo-runbook.md` for the judge-facing happy path and fail-closed backup;
-- `release-checklist.md` for the final regression and secret-safety gate.
+## Useful commands
 
-The hackathon MVP is complete through **Phase 6**. Possible stretch work includes task history, audit filters, production authentication, deployment, and a real marketplace adapter.
+```bash
+pnpm dev                         # Start the development server
+pnpm build                       # Build the production application
+pnpm start                       # Run a completed production build
+pnpm lint                        # Run ESLint
+pnpm typecheck                   # Run strict TypeScript checks
+pnpm test                        # Run all automated tests
+pnpm test:watch                  # Run tests in watch mode
 
-Still intentionally absent:
+pnpm db:generate                 # Generate the Prisma client
+pnpm db:migrate                  # Apply committed migrations
+pnpm db:migrate:dev              # Create a migration during development
+pnpm db:seed                     # Reset and seed the fixed demo namespace
 
-- multi-user authentication and task history;
-- multi-turn chat or autonomous replanning;
-- real marketplace, payments, RAG, and LLM tool calling;
-- production deployment and Persona production configuration.
+pnpm run doctor                  # Check configuration without network calls
+pnpm run doctor -- --live        # Also validate configured OpenAI access
+pnpm demo:success                # Deterministic happy-path demo
+pnpm demo:failure                # Deterministic fail-closed demo
+pnpm run release:verify          # Full automated release gate
+```
+
+`pnpm run release:verify` applies migrations, seeds demo data, runs readiness checks, lint, type checking, tests, and a production build, exercises both deterministic demo outcomes, and restores the demo namespace to a clean state. It does not call real OpenAI or Persona services.
+
+## Application routes
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/health` | Non-sensitive health summary |
+| `GET` | `/api/readiness` | Categorical release and integration readiness |
+| `POST` | `/api/tasks` | Plan a natural-language request; requires `Idempotency-Key` |
+| `GET` | `/api/tasks/:taskId` | Return an allowlisted task snapshot |
+| `POST` | `/api/tasks/:taskId/run` | Run until completion or an authorization boundary |
+| `POST` | `/api/actions/:actionId/confirm` | Approve or reject an exact confirmation payload |
+| `POST` | `/api/actions/:actionId/verification/start` | Pre-create or resume a Persona inquiry |
+| `GET` | `/api/verifications/:verificationId` | Return safe verification status |
+| `POST` | `/api/actions/:actionId/resume` | Resume after server-approved identity authorization |
+| `POST` | `/api/webhooks/persona` | Validate and process Persona's raw signed webhook |
+| `GET` | `/api/demo/context` | Return the fixed demo prompt and inventory preview |
+| `POST` | `/api/demo/reset` | Reset only the fixed demo namespace |
+
+Demo APIs use server-owned demo identity and are unavailable when demo mode is disabled. Callers cannot inject user IDs, session IDs, authorization requirements, or execution state.
+
+## Security model
+
+VerifyAgent treats the browser, model output, and Persona client callbacks as untrusted input.
+
+- The policy engine—not the LLM—assigns `NONE`, `CONFIRM`, or `VERIFIED_IDENTITY`.
+- Every persisted action is reloaded and revalidated before execution.
+- Confirmation evidence includes the user, session, action, and canonical payload hash.
+- Identity grants include the same exact-action scope and expire automatically.
+- The Persona webhook verifies the untouched raw body before parsing.
+- An approved event is followed by an authoritative Persona API lookup and reference-ID comparison.
+- Duplicate and out-of-order webhook deliveries are handled idempotently.
+- Marketplace mutation, action result, grant consumption, and audit events commit transactionally.
+- JSON mutations enforce content type, strict schemas, size limits, and production same-origin checks.
+- API responses include correlation IDs; structured logs recursively redact sensitive values.
+- The production CSP permits only the pinned Persona SDK and inquiry surfaces required by the flow.
+
+The project intentionally does not store identity documents or expose Persona attributes in task or verification responses.
+
+## Project structure
+
+```text
+app/                    Next.js pages and API routes
+components/workspace/   Agent Workspace and authorization UI
+lib/actions/            Canonical action schemas
+lib/authorization/      Confirmation and identity-grant validation
+lib/executor/           The only marketplace execution boundary
+lib/marketplace/        Listing invariants and mutations
+lib/orchestrator/       Restart-safe task runner
+lib/policy/             Deterministic policy engine
+lib/planner/            OpenAI/fake planners, validation, and compilation
+lib/persona/            Persona API, event parsing, and signatures
+lib/verification/       Verification lifecycle and grant issuance
+lib/audit/              Append-only audit writer
+lib/client/             Browser contracts and response validation
+lib/observability/      Correlation IDs, logging, and redaction
+prisma/                 Schema, migrations, and seed data
+scripts/                Demo, diagnostics, and release verification
+tests/                  Unit, contract, integration, and smoke tests
+docs/                   Operational and judge-demo runbooks
+```
+
+## Troubleshooting
+
+### `pnpm doctor -- --live` runs the wrong command
+
+Some pnpm versions include a built-in command named `doctor`. Use the explicit package-script form:
+
+```bash
+pnpm run doctor -- --live
+```
+
+### Persona finishes but VerifyAgent keeps waiting
+
+Check Persona Webhook Events and the local ngrok inspector at [http://127.0.0.1:4040](http://127.0.0.1:4040).
+
+- No webhook event: confirm the webhook was enabled before the inquiry was created.
+- `404` without a request in the current tunnel: replace an example or stale ngrok domain.
+- `404` with a tunnel request: verify the `/api/webhooks/persona` path.
+- `400` or `401`: confirm the signing secret belongs to that exact webhook, then restart VerifyAgent.
+- `200`: return to the VerifyAgent tab so safe polling can resume the approved action.
+
+Do not paste API keys, webhook secrets, raw webhook bodies, or identity data into logs or issue reports.
+
+## Operational guides
+
+- [Real Sandbox runbook](docs/real-sandbox-runbook.md)
+- [Judge demo runbook](docs/demo-runbook.md)
+- [Final acceptance checklist](docs/release-checklist.md)

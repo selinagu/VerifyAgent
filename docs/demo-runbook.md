@@ -2,14 +2,16 @@
 
 ## Primary path
 
-1. Run `pnpm run doctor`, `pnpm db:migrate`, and `pnpm db:seed` before the session.
-2. Open the Workspace and point out the readiness/profile badge.
-3. Submit `Sell my concert ticket for $80.`.
-4. Explain that the model proposes three typed actions but has no execution authority.
-5. Run the task. The private draft executes automatically; setting `$80` pauses for exact-payload confirmation.
-6. Confirm the price and continue. Public publishing pauses for verified identity.
-7. Complete Persona Sandbox verification. Emphasize that the browser callback cannot authorize publishing; VerifyAgent waits for a signed webhook and authoritative server retrieval.
-8. Show the completed listing: `$80`, `PUBLISHED`, version `3`; then show the consumed grant and append-only audit events.
+1. Run `pnpm run release:verify` before the session, then start VerifyAgent and the HTTPS webhook tunnel.
+2. Open `http://localhost:3000` for the judge demo. Do not use the free tunnel URL as the browser-facing application.
+3. Open the Workspace and point out the readiness/profile badge.
+4. Submit `Sell my concert ticket for $80.`.
+5. Explain that the model proposes three typed actions but has no execution authority.
+6. Run the task. The private draft executes automatically; setting `$80` pauses for exact-payload confirmation.
+7. Confirm the price and continue. Public publishing pauses for verified identity.
+8. Complete Persona Sandbox verification. Emphasize that the browser callback cannot authorize publishing; VerifyAgent waits for a signed webhook and authoritative server retrieval.
+9. Return to the VerifyAgent tab so its safe status polling can resume.
+10. Show the completed listing: `$80`, `PUBLISHED`, version `3`; then show the consumed grant and append-only audit events.
 
 ## Deterministic backup
 

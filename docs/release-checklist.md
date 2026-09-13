@@ -1,4 +1,12 @@
-# Phase 6 Release Checklist
+# Phase 7 Final Acceptance Checklist
+
+Run the repeatable engineering gate first:
+
+```bash
+pnpm run release:verify
+```
+
+It applies committed migrations, seeds the fixed demo namespace, checks readiness, runs lint/typecheck/tests/build, exercises deterministic success and fail-closed paths, and reseeds before exit. It never performs live OpenAI or Persona requests. The remaining browser and real-sandbox checks below are intentionally manual.
 
 ## Configuration and safety
 
@@ -7,18 +15,14 @@
 - [ ] Fake planner is used only with `DEMO_MODE=true` or tests.
 - [ ] Production `APP_BASE_URL` is HTTPS and matches the visible application origin.
 - [ ] Persona uses Sandbox, a server-created inquiry template, an allowlisted domain, and the correct webhook secret.
+- [ ] The Persona webhook is enabled before creating the rehearsal inquiry and its URL uses the current HTTPS tunnel plus `/api/webhooks/persona`.
+- [ ] Persona Server API requests use `PERSONA_API_VERSION=2025-10-27`; the Dashboard-controlled Webhook payload version is `2025-12-08` and is treated as a separate contract.
 - [ ] Repository and build artifacts contain no secrets or temporary databases.
 
 ## Quality gate
 
-- [ ] `pnpm lint`
-- [ ] `pnpm typecheck`
-- [ ] `pnpm test`
-- [ ] `pnpm build`
-- [ ] `pnpm db:migrate`
-- [ ] `pnpm db:seed`
-- [ ] `pnpm demo:success`
-- [ ] `pnpm demo:failure`
+- [ ] `pnpm run release:verify`
+- [ ] `pnpm run doctor -- --live` succeeds when a deliberate live OpenAI check is appropriate.
 
 ## Browser and security gate
 
@@ -36,3 +40,10 @@
 - [ ] Browser completion without signed webhook never publishes.
 - [ ] Reset returns the fixed demo namespace to a clean state.
 - [ ] The presenter can switch to the deterministic backup without changing authorization rules.
+- [ ] With the VerifyAgent tab in the foreground, an approved webhook resumes the exact action and consumes the grant once.
+
+## Delivery boundary
+
+- [ ] The local judge demo uses `http://localhost:3000`; ngrok is used only for Persona's server-to-server webhook.
+- [ ] A public judge URL is used only after deployment to a stable HTTPS host with persistent storage.
+- [ ] Production authentication, a real marketplace, and public deployment remain explicitly labeled stretch scope.
