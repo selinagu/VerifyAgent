@@ -9,6 +9,9 @@
 /coverage
 /.vitest
 
+# generated recordings and temporary browser profiles
+/artifacts/
+
 # local environment files
 .env
 .env.local
